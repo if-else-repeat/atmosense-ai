@@ -1,0 +1,37 @@
+{
+  "name": "AtmoSense AI — Urban Air Quality Intelligence",
+  "short_name": "AtmoSense",
+  "description": "Real-time air quality intelligence for smog protection and respiratory health",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#3b82f6",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/pwa-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/pwa-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["health", "weather", "utilities"],
+  "shortcuts": [
+    {
+      "name": "Check AQI",
+      "url": "/?tab=dashboard",
+      "icons": [{ "src": "/pwa-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Family Health",
+      "url": "/?tab=family",
+      "icons": [{ "src": "/pwa-192x192.png", "sizes": "192x192" }]
+    }
+  ]
+}

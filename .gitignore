@@ -1,0 +1,14 @@
+node_modules/
+build/
+dist/
+dev-dist/
+client/dev-dist/
+coverage/
+.aistudio/
+.tsbuildinfo
+.vercel
+.netlify
+.DS_Store
+*.log
+.env*
+!.env.example

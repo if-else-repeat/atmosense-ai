@@ -1,0 +1,37 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["vite/client", "vite-plugin-pwa/client", "node"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "resolveJsonModule": true,
+    "jsx": "react-jsx",
+    "paths": {
+      "@/*": ["./*"],
+      "@client/*": ["./client/src/*"],
+      "@server/*": ["./server/src/*"]
+    },
+    "allowImportingTsExtensions": true,
+    "noEmit": true
+  },
+  "include": [
+    "client/src/**/*",
+    "server/src/**/*",
+    "server/lib/**/*",
+    "server/middleware/**/*",
+    "server/tests/**/*",
+    "server.ts",
+    "vite.config.ts",
+    "vitest.config.ts",
+    "firestore.rules.test.ts"
+  ],
+  "exclude": ["dist", "client/dist", "server/dist", "node_modules"]
+}

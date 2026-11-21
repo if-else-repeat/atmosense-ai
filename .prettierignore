@@ -1,0 +1,10 @@
+dist
+client/dist
+server/dist
+node_modules
+dev-dist
+client/dev-dist
+.playwright-cli
+.aistudio
+coverage
+package-lock.json

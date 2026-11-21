@@ -1,0 +1,6 @@
+{
+  "name": "AtmoSense AI",
+  "description": "Production-ready urban air quality intelligence platform with real-time Leaflet station mapping, native SVG pollutant telemetry charts, Firebase Firestore persistence, PWA offline support, and server-side Gemini 2.5 Pro health advisories.",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
