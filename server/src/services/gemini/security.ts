@@ -43,6 +43,25 @@ const INJECTION_PATTERNS: readonly RegExp[] = [
   /```+/g,
 ];
 
+function stripControlChars(value: string): string {
+  let result = '';
+  for (let i = 0; i < value.length; i += 1) {
+    const code = value.charCodeAt(i);
+    const isAsciiControl =
+      (code >= 0x00 && code <= 0x08) ||
+      code === 0x0b ||
+      code === 0x0c ||
+      (code >= 0x0e && code <= 0x1f) ||
+      code === 0x7f;
+    const isBidiOrZeroWidth =
+      (code >= 0x200b && code <= 0x200f) || (code >= 0x202a && code <= 0x202e) || code === 0xfeff;
+    if (!isAsciiControl && !isBidiOrZeroWidth) {
+      result += value[i];
+    }
+  }
+  return result;
+}
+
 /**
  * Sanitizes untrusted user input prior to prompt construction to prevent prompt injection,
  * control-character smuggling, and excessive token amplification.
@@ -52,9 +71,7 @@ export function sanitizeUserInput(input: string, maxLength = 1000): string {
     return '';
   }
 
-  let cleaned = input
-    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F\u200B-\u200F\u202A-\u202E\uFEFF]/g, '')
-    .trim();
+  let cleaned = stripControlChars(input).trim();
 
   for (const pattern of INJECTION_PATTERNS) {
     cleaned = cleaned.replace(pattern, '[filtered]');

@@ -469,7 +469,7 @@ describe('AQIService — Multi-Source Integration, Fallback, Fusion & Caching', 
   });
 
   it('complies with per-source rate limits and HTTP 429 Retry-After cooldowns', async () => {
-    let currentTime = 1_760_000_000_000;
+    const currentTime = 1_760_000_000_000;
     let waqiCalls = 0;
 
     const mockFetch = vi.fn(async (input: string | URL | Request) => {

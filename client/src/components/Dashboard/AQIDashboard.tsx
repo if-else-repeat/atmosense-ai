@@ -1,17 +1,3 @@
-import {
-  AlertTriangle,
-  ArrowDown,
-  CheckCircle2,
-  Droplets,
-  Info,
-  MapPin,
-  OctagonAlert,
-  RefreshCw,
-  ShieldAlert,
-  Thermometer,
-  WifiOff,
-  Wind,
-} from 'lucide-react';
 import { Suspense, lazy, useCallback, useMemo, useRef, useState, type TouchEvent } from 'react';
 import { AUTO_REFRESH_INTERVAL_MS, useAQI } from '../../hooks/useAQI';
 import type { PersonaProfile, PollutantId } from '../../types/aqi';
@@ -20,6 +6,8 @@ import {
   getAQIStatusPresentation,
   getPersonaHealthGuidance,
 } from '../../utils/dashboardAqi';
+import { AQIHeroPanel } from './AQIHeroPanel';
+import { DashboardBanners, PULL_TRIGGER_PX } from './DashboardBanners';
 import {
   ActionHubSkeleton,
   DashboardLoadingSkeleton,
@@ -51,27 +39,6 @@ export interface AQIDashboardProps {
     humidityPct: number;
     windKph: number;
   };
-}
-
-const PULL_TRIGGER_PX = 68;
-
-function AQIStatusIcon({
-  iconKey,
-}: {
-  iconKey: ReturnType<typeof getAQIStatusPresentation>['iconKey'];
-}) {
-  switch (iconKey) {
-    case 'check':
-      return <CheckCircle2 className="h-5 w-5 shrink-0" aria-hidden="true" />;
-    case 'info':
-      return <Info className="h-5 w-5 shrink-0" aria-hidden="true" />;
-    case 'alert-triangle':
-      return <AlertTriangle className="h-5 w-5 shrink-0" aria-hidden="true" />;
-    case 'shield-alert':
-      return <ShieldAlert className="h-5 w-5 shrink-0" aria-hidden="true" />;
-    case 'octagon-alert':
-      return <OctagonAlert className="h-5 w-5 shrink-0" aria-hidden="true" />;
-  }
 }
 
 /**
@@ -142,11 +109,7 @@ export function AQIDashboard({
     if (touchStartYRef.current === null) return;
     const currentY = event.touches[0]?.clientY ?? touchStartYRef.current;
     const delta = currentY - touchStartYRef.current;
-    if (delta > 0) {
-      setPullDistance(Math.min(104, Math.round(delta * 0.55)));
-    } else {
-      setPullDistance(0);
-    }
+    setPullDistance(delta > 0 ? Math.min(104, Math.round(delta * 0.55)) : 0);
   }, []);
 
   const handleTouchEnd = useCallback(() => {
@@ -178,10 +141,7 @@ export function AQIDashboard({
     [data, persona],
   );
 
-  const whoPm25Ratio = useMemo(() => {
-    if (!data) return '0.0';
-    return (data.pm25 / 15).toFixed(1);
-  }, [data]);
+  const whoPm25Ratio = useMemo(() => (data ? (data.pm25 / 15).toFixed(1) : '0.0'), [data]);
 
   const selectedPollutantMetric = useMemo(
     () => data?.pollutants.find((item) => item.id === selectedPollutant) ?? data?.pollutants[0],
@@ -196,244 +156,31 @@ export function AQIDashboard({
       className="space-y-6"
       data-testid="aqi-dashboard"
     >
-      {/* Pull-to-refresh mobile indicator */}
-      {pullDistance > 12 && (
-        <div
-          role="status"
-          aria-live="polite"
-          className="flex items-center justify-center gap-2 rounded-lg border border-cyan-200 bg-cyan-50/80 py-2 text-xs font-medium text-cyan-800 dark:border-cyan-800/70 dark:bg-cyan-950/40 dark:text-cyan-300"
-        >
-          <ArrowDown
-            className={`h-3.5 w-3.5 transition-transform duration-150 ${
-              pullDistance >= PULL_TRIGGER_PX ? 'rotate-180' : ''
-            }`}
-            aria-hidden="true"
-          />
-          <span>
-            {pullDistance >= PULL_TRIGGER_PX
-              ? 'Release to refresh air quality data'
-              : 'Pull down to refresh'}
-          </span>
-        </div>
-      )}
+      <DashboardBanners
+        pullDistance={pullDistance}
+        isOffline={isOffline}
+        isFromCache={isFromCache}
+        serviceWorkerActive={serviceWorkerActive}
+        loading={loading}
+        error={error}
+        hasData={Boolean(data)}
+        onRefresh={() => void refresh()}
+      />
 
-      {/* Service Worker Offline Indicator */}
-      {(isOffline || isFromCache) && (
-        <div
-          role="status"
-          aria-live="polite"
-          className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-xs text-amber-950 dark:border-amber-800/70 dark:bg-amber-950/45 dark:text-amber-200"
-        >
-          <div className="flex items-center gap-2.5">
-            <WifiOff
-              className="h-4 w-4 shrink-0 text-amber-700 dark:text-amber-400"
-              aria-hidden="true"
-            />
-            <span>
-              <strong>Offline mode</strong>
-              {serviceWorkerActive
-                ? ' — Service Worker is serving cached air quality readings.'
-                : ' — displaying last cached air quality readings.'}
-            </span>
-          </div>
-          {!isOffline && (
-            <button
-              type="button"
-              onClick={() => void refresh()}
-              className="whitespace-nowrap font-medium underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-600"
-            >
-              Sync live data
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* Initial Loading Skeleton */}
       {loading && !data && <DashboardLoadingSkeleton />}
 
-      {/* Blocking Error State with Retry Button */}
-      {!loading && error && !data && (
-        <section
-          role="alert"
-          className="rounded-xl border border-red-200 bg-white p-6 dark:border-red-900/70 dark:bg-slate-900"
-        >
-          <div className="flex items-start gap-3">
-            <ShieldAlert
-              className="mt-0.5 h-5 w-5 shrink-0 text-red-600 dark:text-red-400"
-              aria-hidden="true"
-            />
-            <div className="min-w-0 flex-1">
-              <h2 className="font-display text-base font-semibold text-slate-900 dark:text-slate-100">
-                Unable to load live air quality data
-              </h2>
-              <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{error}</p>
-              <div className="mt-4">
-                <button
-                  type="button"
-                  onClick={() => void refresh()}
-                  className="inline-flex items-center gap-2 rounded-lg bg-cyan-700 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-cyan-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-600 focus-visible:ring-offset-2 dark:bg-cyan-600 dark:hover:bg-cyan-500 dark:focus-visible:ring-offset-slate-900"
-                >
-                  <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
-                  Retry
-                </button>
-              </div>
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* Non-blocking Refresh Error Banner (when stale data is still visible) */}
-      {error && data && (
-        <div
-          role="alert"
-          className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-900 dark:border-red-900/70 dark:bg-red-950/40 dark:text-red-200"
-        >
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
-            <span>Refresh failed: {error}</span>
-          </div>
-          <button
-            type="button"
-            onClick={() => void refresh()}
-            className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-red-300 bg-white px-3 py-1 text-xs font-medium text-red-800 hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600 dark:border-red-800 dark:bg-slate-900 dark:text-red-200"
-          >
-            <RefreshCw className="h-3 w-3" aria-hidden="true" />
-            Retry
-          </button>
-        </div>
-      )}
-
-      {/* Populated Dashboard View */}
       {data && statusPresentation && inversionAssessment && personaGuidance && (
         <>
-          {/* 1. Primary Real-Time AQI Display Hero Panel */}
-          <section
-            aria-labelledby="realtime-aqi-heading"
-            className="rounded-xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900"
-          >
-            <div className="flex flex-col justify-between gap-6 lg:flex-row lg:items-center">
-              {/* Left: Location + Large Accessible AQI Number + Status (Color + Icon + Text) */}
-              <div className="space-y-3">
-                <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
-                  <MapPin
-                    className="h-3.5 w-3.5 shrink-0 text-cyan-700 dark:text-cyan-400"
-                    aria-hidden="true"
-                  />
-                  <h1
-                    id="realtime-aqi-heading"
-                    className="font-display text-sm font-semibold text-slate-900 dark:text-slate-100"
-                  >
-                    {data.location.name}
-                  </h1>
-                  {data.location.district && (
-                    <>
-                      <span aria-hidden="true">·</span>
-                      <span>{data.location.district}</span>
-                    </>
-                  )}
-                </div>
+          <AQIHeroPanel
+            data={data}
+            statusPresentation={statusPresentation}
+            lastUpdatedText={lastUpdatedText}
+            whoPm25Ratio={whoPm25Ratio}
+            refreshing={refreshing}
+            onRefresh={() => void refresh()}
+            onNavigateMap={onNavigateMap}
+          />
 
-                {/* Large, accessible real-time AQI value with aria-live="polite" */}
-                <div className="flex flex-wrap items-baseline gap-4">
-                  <div
-                    aria-live="polite"
-                    aria-atomic="true"
-                    className="flex items-baseline gap-2"
-                    data-testid="realtime-aqi-value"
-                  >
-                    <span className="font-mono text-6xl font-bold tracking-tight tabular-nums text-slate-950 sm:text-7xl dark:text-white">
-                      {data.aqi}
-                    </span>
-                    <span className="font-mono text-sm font-medium text-slate-500 dark:text-slate-400">
-                      US AQI
-                    </span>
-                  </div>
-
-                  {/* Status strictly conveys Color + Icon + Text (never color alone) */}
-                  <div
-                    className={`inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm font-semibold ${statusPresentation.borderClass} ${statusPresentation.surfaceClass} ${statusPresentation.textClass}`}
-                  >
-                    <AQIStatusIcon iconKey={statusPresentation.iconKey} />
-                    <span>{statusPresentation.category}</span>
-                  </div>
-                </div>
-
-                {/* Data Source Attribution + Auto-Refresh Metadata (clean unboxed text) */}
-                <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
-                  <span data-testid="aqi-source-attribution">
-                    Source: {data.source}, updated {lastUpdatedText}
-                  </span>
-                  <span aria-hidden="true">·</span>
-                  <span>Dominant pollutant: {data.dominantPollutant}</span>
-                  <span aria-hidden="true">·</span>
-                  <span className="font-mono tabular-nums">
-                    {whoPm25Ratio}× WHO 24h PM2.5 guideline
-                  </span>
-                </div>
-              </div>
-
-              {/* Right: Meteorological drivers + Direct Actions */}
-              <div className="flex flex-col items-start gap-4 sm:items-end">
-                <dl className="grid grid-cols-3 gap-5 border-t border-slate-100 pt-3 sm:border-t-0 sm:pt-0 dark:border-slate-800">
-                  <div>
-                    <dt className="flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400">
-                      <Thermometer className="h-3 w-3" aria-hidden="true" />
-                      Temp
-                    </dt>
-                    <dd className="mt-0.5 font-mono text-base font-semibold tabular-nums text-slate-900 dark:text-slate-100">
-                      {data.temperatureC.toFixed(1)}°C
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400">
-                      <Droplets className="h-3 w-3" aria-hidden="true" />
-                      Humidity
-                    </dt>
-                    <dd className="mt-0.5 font-mono text-base font-semibold tabular-nums text-slate-900 dark:text-slate-100">
-                      {data.humidityPct.toFixed(0)}%
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400">
-                      <Wind className="h-3 w-3" aria-hidden="true" />
-                      Wind
-                    </dt>
-                    <dd className="mt-0.5 font-mono text-base font-semibold tabular-nums text-slate-900 dark:text-slate-100">
-                      {data.windKph.toFixed(0)} km/h
-                    </dd>
-                  </div>
-                </dl>
-
-                <div className="flex flex-wrap items-center gap-2.5">
-                  <button
-                    type="button"
-                    onClick={() => void refresh()}
-                    disabled={refreshing}
-                    aria-label="Refresh live air quality readings"
-                    className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-600 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-800 dark:focus-visible:ring-offset-slate-900"
-                  >
-                    <RefreshCw
-                      className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`}
-                      aria-hidden="true"
-                    />
-                    {refreshing ? 'Updating…' : 'Refresh now'}
-                  </button>
-
-                  {onNavigateMap && (
-                    <button
-                      type="button"
-                      onClick={onNavigateMap}
-                      className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg bg-cyan-700 px-3.5 py-2 text-xs font-medium text-white transition-colors hover:bg-cyan-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-600 focus-visible:ring-offset-2 dark:bg-cyan-600 dark:hover:bg-cyan-500 dark:focus-visible:ring-offset-slate-900"
-                    >
-                      Explore Station Map
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-          </section>
-
-          {/* 2. Pollutant Breakdown Grid: PM2.5, PM10, NO2, CO, O3 (React.memo cards) */}
           <section aria-labelledby="pollutants-grid-heading" className="space-y-3">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <h2
@@ -462,12 +209,10 @@ export function AQIDashboard({
             </div>
           </section>
 
-          {/* 3. Lazy-Loaded Native SVG 24-Hour Forecast Chart */}
           <Suspense fallback={<ForecastChartSkeleton />}>
             <LazyForecastChart forecast={data.forecast} locationName={data.location.name} />
           </Suspense>
 
-          {/* 4 & 5. Lower Split: Inversion Risk Indicator + Persona Health Recommendation */}
           <div className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-2">
             <InversionIndicator assessment={inversionAssessment} />
             <HealthRecommendation
@@ -478,7 +223,6 @@ export function AQIDashboard({
             />
           </div>
 
-          {/* 6. Winter Smog Action Hub: Low-Emission Routines, IAQ Hacks & Sustainable Alternatives */}
           <Suspense fallback={<ActionHubSkeleton />}>
             <LazyWinterSmogActionHub
               locationName={data.location.name}

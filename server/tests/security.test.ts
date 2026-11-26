@@ -45,10 +45,18 @@ describe('Security Middleware Stack — Helmet, CORS, Rate Limiting, Validation,
       expect(csp).toContain("script-src 'self' 'unsafe-inline'");
       expect(csp).toContain("style-src 'self' 'unsafe-inline'");
       expect(csp).toContain("img-src 'self' data: blob: https:");
+      expect(csp).toContain("object-src 'none'");
+      expect(csp).toContain("base-uri 'self'");
       expect(csp).toContain("frame-ancestors 'self' https:");
       expect(csp).toContain('https://api.waqi.info');
       expect(csp).toContain('https://api.openaq.org');
       expect(csp).toContain('https://api.openweathermap.org');
+      expect(res.headers.get('referrer-policy')).toBe('strict-origin-when-cross-origin');
+      expect(res.headers.get('permissions-policy')).toContain('camera=(self)');
+      expect(res.headers.get('permissions-policy')).toContain('microphone=(self)');
+      expect(res.headers.get('permissions-policy')).toContain('geolocation=(self)');
+      expect(res.headers.get('permissions-policy')).toContain('payment=()');
+      expect(res.headers.get('permissions-policy')).toContain('usb=()');
     } finally {
       await server.close();
     }

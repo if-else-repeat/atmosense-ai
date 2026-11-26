@@ -3,9 +3,9 @@
 > **Breathe with foresight.** Hyperlocal multi-source air quality telemetry, atmospheric inversion physics, family respiratory protection, and evidence-based pulmonary guidance—engineered for everyday urban resilience.
 
 [![CI Pipeline](https://img.shields.io/badge/CI-Passing-16a34a?style=flat-square&logo=githubactions&logoColor=white)](./TESTING.md)
-[![Test Suite](https://img.shields.io/badge/Tests-158%20Passing-16a34a?style=flat-square&logo=vitest&logoColor=white)](./TESTING.md)
-[![Code Coverage](https://img.shields.io/badge/Coverage-88.3%25%20Stmts%20%7C%2090.8%25%20Lines-0e7490?style=flat-square)](./TESTING.md)
-[![Initial Bundle](https://img.shields.io/badge/Initial%20Bundle-171.8%20KB%20gzip-0e7490?style=flat-square)](./EFFICIENCY.md)
+[![Test Suite](https://img.shields.io/badge/Tests-160%20Passing-16a34a?style=flat-square&logo=vitest&logoColor=white)](./TESTING.md)
+[![Code Coverage](https://img.shields.io/badge/Coverage-89.2%25%20Stmts%20%7C%2091.7%25%20Lines-0e7490?style=flat-square)](./TESTING.md)
+[![Initial Bundle](https://img.shields.io/badge/Initial%20Bundle-155.2%20KB%20gzip-0e7490?style=flat-square)](./EFFICIENCY.md)
 [![Accessibility](https://img.shields.io/badge/WCAG%202.2-AA%20Compliant-2563eb?style=flat-square)](./ACCESSIBILITY.md)
 [![Security](https://img.shields.io/badge/Security-OWASP%20%2B%20STRIDE%20Hardened-0f172a?style=flat-square)](./SECURITY.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-0284c7?style=flat-square)](#license)
@@ -16,7 +16,7 @@
 
 1. [Problem Statement](#problem-statement)
 2. [The AtmoSense AI Solution](#the-atmosense-ai-solution)
-3. [Visual Walkthrough & Screenshots](#visual-walkthrough--screenshots)
+3. [Interface Walkthrough & Core Views](#interface-walkthrough--core-views)
 4. [26 Core & Differentiating Features](#26-core--differentiating-features)
 5. [System Architecture](#system-architecture)
 6. [Technology Stack](#technology-stack)
@@ -65,33 +65,31 @@ AtmoSense AI directly delivers every objective of **Challenge 6** through an int
 
 ---
 
-## Visual Walkthrough & Screenshots
+## Interface Walkthrough & Core Views
 
-All screenshots below were captured directly from the live running AtmoSense AI application in headless Chromium at `1440×900` with zero console errors or warnings.
+```text
++-------------------------------------------------------------------------------------+
+| AtmoSense AI  [Search City / GPS]        [Saved Zones] [Install PWA] [Light / Dark] |
++-------------------------------------------------------------------------------------+
+| [ Monitor ]   [ Live Map ]   [ AI Assistant ]   [ Family Health ]   [ Community ]   |
++-------------------------------------------------------------------------------------+
+|  LIVE AQI HERO CARD (EPA + WHO 2021)     |  INVERSION RISK & 24h SVG FORECAST       |
+|  AQI 164 · Unhealthy · PM2.5 Dominant    |  06:00-10:00 Inversion Lid Trapping      |
+|  [PM2.5] [PM10] [NO2] [O3] [CO] Cards    |  11:00-16:00 Safe Convection Window      |
++-------------------------------------------------------------------------------------+
+|  WINTER SMOG ACTION HUB (Location + Household Lifestyle Profile)                    |
+|  [ Sustainable Alternatives & Direct Impact ] [ Indoor Air Hacks ] [ Daily Routine ]|
+|  -> Live Family Lung PM2.5 Reduction %, Monthly CO2 Cut, DIY Corsi-Rosenthal CADR   |
++-------------------------------------------------------------------------------------+
+```
 
-### 1. Real-Time Air Quality Monitor & Winter Smog Action Hub (Light Mode)
-
-Auto-detects and caches the user's current location (`My Location`), fuses live `WAQI+OpenWeather` telemetry, displays accessible numeric AQI with icon + text status badges, renders five memoized pollutant cards, plots a lazy-loaded native SVG 24-hour forecast highlighting the 11:00–16:00 convection window, and mounts the **Winter Smog Action Hub** (Sustainable Alternatives & Direct Impact, Indoor Air Hacks, and Low-Emission Daily Routine).
-
-![AtmoSense AI Real-Time Dashboard — Light Mode](./docs/screenshots/dashboard-light.png)
-
-### 2. Full Dark Mode Support
-
-Low-glare dark palette tuned to exceed WCAG 2.2 AA contrast ratios (`> 4.5:1`) for evening and overnight respiratory monitoring without eye strain.
-
-![AtmoSense AI Real-Time Dashboard — Dark Mode](./docs/screenshots/dashboard-dark.png)
-
-### 3. Interactive OpenStreetMap & Leaflet Station Network
-
-Zero-API-key OpenStreetMap tiles with live AQI dispersion radius overlays, interactive current-location pinpointing, station jump list, and one-click transition into the AI Health Brief for any selected zone.
-
-![AtmoSense AI Interactive OpenStreetMap View](./docs/screenshots/map-view.png)
-
-### 4. Family Health Protection, Symptom Tracker & AI Correlation Insights
-
-Manage vulnerable household members, log coughing/wheezing/eye irritation/shortness of breath/headache linked to live AQI, review correlation strength with explicit AI consent controls, export doctor-ready PDF summaries, or erase all health data under GDPR.
-
-![AtmoSense AI Family Health Protection Tab](./docs/screenshots/family-health.png)
+| Primary View      | Key Modules                                                                  | Core User Outcomes                                                                                                              |
+| ----------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| **Monitor**       | `AQIDashboard`, `ForecastChart`, `InversionIndicator`, `WinterSmogActionHub` | Real-time fused EPA/WHO telemetry, thermal inversion alerts, 24h SVG trajectory, IAQ CADR calculator, & direct impact engine.   |
+| **Live Map**      | `AirQualityMap`, `SavedZonesPanel`                                           | Zero-key OpenStreetMap + Leaflet station dispersion overlays, GPS pinpointing, and one-click side-by-side zone comparison.      |
+| **AI Assistant**  | `HealthAssistantPanel`, `VoiceInterface`                                     | Server-side Gemini pulmonary Q&A, multilingual emergency alerts, photo smog hazard scan, and hands-free voice synthesis.        |
+| **Family Health** | `FamilyManager`, `SymptomTracker`, `HealthInsights`, `healthCrypto`          | Browser-local AES-256-GCM encrypted household profiles, 5-symptom AQI correlation insights, clinician print view, GDPR erasure. |
+| **Community**     | `CommunityHub`, `EnvironmentalJustice`, `PledgeSystem`, `Leaderboard`        | Crowdsourced neighborhood smog feed, district pollution disparity index, collective $\text{CO}_2$ pledges, and safety alerts.   |
 
 ---
 

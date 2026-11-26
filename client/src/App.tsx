@@ -1,24 +1,17 @@
-import { LocateFixed, MapPin, WifiOff } from 'lucide-react';
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { AQIDashboard } from './components/Dashboard/AQIDashboard';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { LocationSubBar } from './components/LocationSubBar';
 import { OfflineIndicator } from './components/OfflineIndicator';
 import { TopBar } from './components/TopBar';
 import { WorkspaceProvider, useWorkspace } from './context/AuthContext';
-import type { ActiveTab, AirQualityStation, SensitivityProfile } from './types/airQuality';
-import { OFFLINE_FALLBACK_STATIONS } from './utils/airQuality';
+import { useStationNetwork } from './hooks/useStationNetwork';
+import type { ActiveTab, SensitivityProfile } from './types/airQuality';
 import {
   THEME_STORAGE_KEY,
-  getBrowserCoordinates,
-  mergeStationsWithCurrent,
   personaToSensitivity,
-  readCachedCurrentLocation,
-  readCachedStations,
   readInitialTheme,
   sensitivityToPersona,
-  writeCachedCurrentLocation,
-  writeCachedStations,
-  type CachedCurrentLocation,
 } from './utils/locationStorage';
 
 const AirQualityMap = lazy(() =>
@@ -53,38 +46,25 @@ function TabLoadingFallback() {
 
 function WorkspaceShell() {
   const { profile, savedLocations } = useWorkspace();
-
-  const initialSavedLocRef = useRef<CachedCurrentLocation | null | undefined>(undefined);
-  if (initialSavedLocRef.current === undefined) {
-    initialSavedLocRef.current = readCachedCurrentLocation();
-  }
-  const initialSavedLoc = initialSavedLocRef.current;
+  const {
+    stations,
+    selectedStation,
+    setSelectedStationId,
+    loadingStations,
+    refreshing,
+    locating,
+    isOnline,
+    locationStatus,
+    fetchError,
+    loadStations,
+    detectCurrentLocation,
+  } = useStationNetwork();
 
   const [activeTab, setActiveTab] = useState<ActiveTab>('monitor');
-  const [stations, setStations] = useState<AirQualityStation[]>(() => {
-    const cachedList = readCachedStations() ?? OFFLINE_FALLBACK_STATIONS;
-    return mergeStationsWithCurrent(cachedList, initialSavedLoc?.station ?? null);
-  });
-  const [selectedStationId, setSelectedStationId] = useState<string>(() =>
-    initialSavedLoc ? 'current-location' : OFFLINE_FALLBACK_STATIONS[0]!.id,
-  );
-  const [loadingStations, setLoadingStations] = useState<boolean>(false);
-  const [refreshing, setRefreshing] = useState<boolean>(false);
-  const [locating, setLocating] = useState<boolean>(false);
-  const [isOnline, setIsOnline] = useState<boolean>(() =>
-    typeof navigator === 'undefined' ? true : navigator.onLine,
-  );
-  const [locationStatus, setLocationStatus] = useState<string | null>(() =>
-    initialSavedLoc
-      ? `Saved location · ${initialSavedLoc.station.city}, ${initialSavedLoc.station.country}`
-      : null,
-  );
-  const [fetchError, setFetchError] = useState<string | null>(null);
   const [sensitivityProfile, setSensitivityProfile] = useState<SensitivityProfile>(
     () => profile?.sensitivityProfile ?? 'general',
   );
   const [isDark, setIsDark] = useState<boolean>(readInitialTheme);
-  const currentLocationRef = useRef<CachedCurrentLocation | null>(initialSavedLoc);
 
   useEffect(() => {
     if (profile?.sensitivityProfile) {
@@ -101,208 +81,15 @@ function WorkspaceShell() {
     }
   }, [isDark]);
 
-  const upsertCurrentLocationStation = useCallback(
-    (
-      station: AirQualityStation,
-      method: 'gps' | 'ip',
-      options: { select?: boolean; statusText?: string } = {},
-    ) => {
-      const { select = true, statusText } = options;
-      const normalized: AirQualityStation = { ...station, id: 'current-location' };
-      const cachedEntry: CachedCurrentLocation = {
-        station: normalized,
-        method,
-        savedAt: new Date().toISOString(),
-      };
-      currentLocationRef.current = cachedEntry;
-      writeCachedCurrentLocation(cachedEntry);
-
-      setStations((prev) => {
-        const merged = mergeStationsWithCurrent(prev, normalized);
-        writeCachedStations(merged);
-        return merged;
-      });
-      if (select) setSelectedStationId('current-location');
-      if (statusText) setLocationStatus(statusText);
-    },
-    [],
-  );
-
-  const refreshSavedCurrentLocation = useCallback(
-    async (forceRefresh = false): Promise<boolean> => {
-      const saved = currentLocationRef.current;
-      if (!saved || (typeof navigator !== 'undefined' && !navigator.onLine)) return false;
-
-      try {
-        const refreshQuery = forceRefresh ? '&refresh=1' : '';
-        const res = await fetch(
-          `/api/air-quality/by-coords?lat=${encodeURIComponent(saved.station.latitude)}&lng=${encodeURIComponent(saved.station.longitude)}&stationId=current-location${refreshQuery}`,
-        );
-        if (!res.ok) return false;
-
-        const payload = (await res.json()) as { station?: AirQualityStation };
-        if (payload.station) {
-          upsertCurrentLocationStation(payload.station, saved.method, {
-            select: false,
-            statusText: `Saved location · ${payload.station.city}, ${payload.station.country}`,
-          });
-          return true;
-        }
-      } catch {
-        // Keep browser-cached snapshot intact when offline or unreachable
-      }
-      return false;
-    },
-    [upsertCurrentLocationStation],
-  );
-
-  const detectCurrentLocation = useCallback(
-    async (options: { userInitiated?: boolean; forceRefresh?: boolean } = {}) => {
-      const { userInitiated = false, forceRefresh = false } = options;
-      if (typeof navigator !== 'undefined' && !navigator.onLine) {
-        if (userInitiated) {
-          setLocationStatus('Offline · Connect to the internet to update your location');
-        }
-        return;
-      }
-
-      setLocating(true);
-      setLocationStatus('Detecting your location...');
-      const refreshQuery = forceRefresh ? '&refresh=1' : '';
-
-      try {
-        const coords = await getBrowserCoordinates(userInitiated ? 9000 : 5500);
-        const res = await fetch(
-          `/api/air-quality/by-coords?lat=${encodeURIComponent(coords.latitude)}&lng=${encodeURIComponent(coords.longitude)}&stationId=current-location${refreshQuery}`,
-        );
-        if (res.ok) {
-          const payload = (await res.json()) as { station?: AirQualityStation };
-          if (payload.station) {
-            upsertCurrentLocationStation(payload.station, 'gps', {
-              select: true,
-              statusText: `Saved GPS · ${payload.station.city}, ${payload.station.country}`,
-            });
-            setLocating(false);
-            return;
-          }
-        }
-      } catch {
-        // GPS unavailable or denied — seamlessly fall back to server-side IP lookup
-      }
-
-      try {
-        const res = await fetch(
-          `/api/air-quality/detect-location${forceRefresh ? '?refresh=1' : ''}`,
-        );
-        if (res.ok) {
-          const payload = (await res.json()) as {
-            detected?: boolean;
-            station?: AirQualityStation | null;
-          };
-          if (payload.detected && payload.station) {
-            upsertCurrentLocationStation(payload.station, 'ip', {
-              select: true,
-              statusText: `Saved location · ${payload.station.city}, ${payload.station.country}`,
-            });
-            setLocating(false);
-            return;
-          }
-        }
-      } catch {
-        // Network error during IP detection
-      }
-
-      setLocationStatus(
-        userInitiated
-          ? 'Could not detect location — allow browser location access or pick a city.'
-          : currentLocationRef.current
-            ? `Saved location · ${currentLocationRef.current.station.city}, ${currentLocationRef.current.station.country}`
-            : null,
-      );
-      setLocating(false);
-    },
-    [upsertCurrentLocationStation],
-  );
-
-  const loadStations = useCallback(
-    async (forceRefresh = false) => {
-      if (typeof navigator !== 'undefined' && !navigator.onLine) {
-        setFetchError(null);
-        return;
-      }
-
-      if (forceRefresh) setRefreshing(true);
-      else setLoadingStations(true);
-      setFetchError(null);
-
-      try {
-        const response = await fetch(`/api/air-quality${forceRefresh ? '?refresh=1' : ''}`);
-        if (!response.ok) throw new Error(`Telemetry API returned ${response.status}`);
-
-        const data = (await response.json()) as { stations?: AirQualityStation[] };
-        if (Array.isArray(data.stations) && data.stations.length > 0) {
-          if (currentLocationRef.current) {
-            await refreshSavedCurrentLocation(forceRefresh);
-          }
-
-          const merged = mergeStationsWithCurrent(
-            data.stations,
-            currentLocationRef.current?.station ?? null,
-          );
-          writeCachedStations(merged);
-          setStations(merged);
-          setSelectedStationId((prev) =>
-            merged.some((st) => st.id === prev) ? prev : merged[0]!.id,
-          );
-        }
-      } catch (error) {
-        setFetchError(
-          error instanceof Error
-            ? `${error.message} — showing browser-cached readings.`
-            : 'Unable to reach telemetry feed — showing browser-cached readings.',
-        );
-      } finally {
-        setLoadingStations(false);
-        setRefreshing(false);
-      }
-    },
-    [refreshSavedCurrentLocation],
-  );
-
-  useEffect(() => {
-    if (typeof navigator !== 'undefined' && !navigator.onLine) return;
-    void loadStations(false);
-    if (!currentLocationRef.current) {
-      void detectCurrentLocation({ userInitiated: false });
-    }
-  }, [loadStations, detectCurrentLocation]);
-
-  useEffect(() => {
-    const handleOnline = () => {
-      setIsOnline(true);
-      setFetchError(null);
-      void loadStations(true);
-      if (!currentLocationRef.current) {
-        void detectCurrentLocation({ userInitiated: false });
-      }
-    };
-    const handleOffline = () => setIsOnline(false);
-
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, [loadStations, detectCurrentLocation]);
-
-  const selectedStation =
-    stations.find((st) => st.id === selectedStationId) ??
-    stations[0] ??
-    OFFLINE_FALLBACK_STATIONS[0]!;
-
   return (
     <div className="flex min-h-screen flex-col overflow-x-hidden bg-slate-50 text-slate-900 transition-colors dark:bg-slate-950 dark:text-slate-100">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-cyan-700 focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-white focus:shadow-lg focus:outline-none focus:ring-2 focus:ring-cyan-400"
+      >
+        Skip to main content
+      </a>
+
       <TopBar
         activeTab={activeTab}
         onSelectTab={setActiveTab}
@@ -315,68 +102,23 @@ function WorkspaceShell() {
         onRefresh={() => void loadStations(true)}
       />
 
-      <div className="border-b border-slate-200/80 bg-white/75 dark:border-slate-800/80 dark:bg-slate-900/60">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2.5 px-4 py-2 sm:px-6 lg:px-8">
-          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 text-xs">
-            <span className="inline-flex items-center gap-1.5 font-medium text-slate-500 dark:text-slate-400">
-              <MapPin className="h-3.5 w-3.5 text-cyan-700 dark:text-cyan-400" aria-hidden="true" />
-              <label htmlFor="global-station-select">Location</label>
-            </span>
+      <LocationSubBar
+        stations={stations}
+        selectedStation={selectedStation}
+        onSelectStation={setSelectedStationId}
+        onDetectLocation={() =>
+          void detectCurrentLocation({ userInitiated: true, forceRefresh: true })
+        }
+        locating={locating}
+        isOnline={isOnline}
+        locationStatus={locationStatus}
+      />
 
-            <select
-              id="global-station-select"
-              value={selectedStation.id}
-              onChange={(e) => setSelectedStationId(e.target.value)}
-              className="min-w-0 max-w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-900 focus:border-cyan-700 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-            >
-              {stations.map((st) => (
-                <option key={st.id} value={st.id}>
-                  {st.id === 'current-location'
-                    ? `My Location — ${st.city}, ${st.country} (AQI ${st.aqi})`
-                    : `${st.city} — ${st.district} (AQI ${st.aqi})`}
-                </option>
-              ))}
-            </select>
-
-            <button
-              type="button"
-              disabled={locating || !isOnline}
-              onClick={() =>
-                void detectCurrentLocation({ userInitiated: true, forceRefresh: true })
-              }
-              aria-label="Update my current location"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-700/35 bg-cyan-50 px-2.5 py-1.5 text-xs font-medium text-cyan-900 transition-colors hover:bg-cyan-100 disabled:opacity-50 dark:border-cyan-500/35 dark:bg-cyan-950/60 dark:text-cyan-200 dark:hover:bg-cyan-900/60 whitespace-nowrap shrink-0"
-            >
-              <LocateFixed
-                className={`h-3.5 w-3.5 ${locating ? 'animate-pulse' : ''}`}
-                aria-hidden="true"
-              />
-              {locating ? 'Locating...' : 'My Location'}
-            </button>
-          </div>
-
-          <div
-            className="hidden items-center gap-2 text-xs text-slate-500 dark:text-slate-400 md:flex shrink-0"
-            aria-live="polite"
-          >
-            {!isOnline ? (
-              <span className="inline-flex items-center gap-1.5 text-amber-700 dark:text-amber-300">
-                <WifiOff className="h-3.5 w-3.5" aria-hidden="true" />
-                Offline · Browser cached
-              </span>
-            ) : (
-              <span>
-                {locationStatus ??
-                  (selectedStation.source === 'live-open-meteo'
-                    ? 'Open-Meteo live feed'
-                    : 'Calibrated urban baseline')}
-              </span>
-            )}
-          </div>
-        </div>
-      </div>
-
-      <main className="mx-auto w-full min-w-0 max-w-7xl flex-1 px-4 py-6 sm:px-6 lg:px-8">
+      <main
+        id="main-content"
+        tabIndex={-1}
+        className="mx-auto w-full min-w-0 max-w-7xl flex-1 px-4 py-6 focus:outline-none sm:px-6 lg:px-8"
+      >
         {fetchError && (
           <div
             role="status"

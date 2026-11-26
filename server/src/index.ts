@@ -1,8 +1,8 @@
 import express from 'express';
 import fs from 'node:fs';
+import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createServer as createViteServer } from 'vite';
 import {
   apiKeyAuth,
   corsMiddleware,
@@ -70,13 +70,20 @@ export function createApp(): express.Express {
 
 export async function startServer(): Promise<void> {
   const app = createApp();
+  const httpServer = http.createServer(app);
   const isProd = process.env.NODE_ENV === 'production';
   const port = Number(process.env.PORT) || 3000;
 
   if (!isProd) {
+    const { createServer: createViteServer } = await import('vite');
+    const hmrDisabled = process.env.DISABLE_HMR === 'true';
     const vite = await createViteServer({
       configFile: path.resolve(ROOT_DIR, 'vite.config.ts'),
-      server: { middlewareMode: true, allowedHosts: true },
+      server: {
+        middlewareMode: true,
+        allowedHosts: true,
+        hmr: hmrDisabled ? false : { server: httpServer },
+      },
       appType: 'spa',
     });
     app.use(vite.middlewares);
@@ -94,7 +101,7 @@ export async function startServer(): Promise<void> {
 
   app.use(errorHandler);
 
-  app.listen(port, '0.0.0.0', () => {
+  httpServer.listen(port, '0.0.0.0', () => {
     logger.info(`AtmoSense AI server running on http://0.0.0.0:${port}`);
   });
 }

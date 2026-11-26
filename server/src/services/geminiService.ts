@@ -24,7 +24,7 @@ function getGeminiClient(): { ai: GoogleGenAI; model: string } {
     apiKey,
     httpOptions: {
       headers: {
-        'User-Agent': 'aistudio-build',
+        'User-Agent': 'atmosense-ai/1.0',
       },
     },
   });

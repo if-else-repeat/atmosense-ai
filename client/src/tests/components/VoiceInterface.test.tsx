@@ -23,13 +23,8 @@ describe('VoiceInterface Component', () => {
   });
 
   it('starts speech recognition, captures transcript, and invokes onTranscriptCommand', () => {
-    let instanceRef: {
-      onresult: ((e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
-      start: () => void;
-      stop: () => void;
-    } | null = null;
-
     class MockSpeechRecognition {
+      static lastInstance: MockSpeechRecognition | null = null;
       lang = '';
       interimResults = false;
       continuous = false;
@@ -40,7 +35,7 @@ describe('VoiceInterface Component', () => {
       start = vi.fn();
       stop = vi.fn();
       constructor() {
-        instanceRef = this;
+        MockSpeechRecognition.lastInstance = this;
       }
     }
 
@@ -59,7 +54,7 @@ describe('VoiceInterface Component', () => {
     expect(screen.getByRole('button', { name: /Stop Listening/i })).toBeInTheDocument();
 
     act(() => {
-      instanceRef?.onresult?.({
+      MockSpeechRecognition.lastInstance?.onresult?.({
         results: [[{ transcript: 'Is it safe for children outdoors?' }]],
       });
     });

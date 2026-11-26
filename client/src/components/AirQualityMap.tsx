@@ -3,6 +3,7 @@ import { Compass, Layers, Navigation } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { AirQualityStation } from '../types/airQuality';
 import { getAqiTone } from '../utils/airQuality';
+import { findNearestStation, renderStationLayers } from './Map/mapMarkers';
 
 interface AirQualityMapProps {
   stations: readonly AirQualityStation[];
@@ -58,64 +59,21 @@ export function AirQualityMap({
     };
   }, []);
 
-  // Re-render markers and exposure circles when stations, selection, or layer toggle changes
   useEffect(() => {
     const markersLayer = markersLayerRef.current;
     const circlesLayer = circlesLayerRef.current;
     if (!markersLayer || !circlesLayer) return;
 
-    markersLayer.clearLayers();
-    circlesLayer.clearLayers();
-
-    for (const station of stations) {
-      const tone = getAqiTone(station.category.key);
-      const isSelected = station.id === selectedStation.id;
-      const isCurrentLoc = station.id === 'current-location';
-      const label = isCurrentLoc ? `My Location · ${station.city}` : station.city;
-
-      const html = `
-        <button
-          type="button"
-          aria-label="Inspect ${label} station, AQI ${station.aqi}"
-          style="
-            display:flex;align-items:center;gap:6px;padding:4px 9px;border-radius:8px;
-            background:${isSelected ? '#0f172a' : isCurrentLoc ? '#ecfeff' : '#ffffff'};
-            color:${isSelected ? '#ffffff' : '#0f172a'};
-            border:2px solid ${isCurrentLoc ? '#0e7490' : tone.accentHex};
-            box-shadow:0 2px 8px rgba(15,23,42,0.18);
-            font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;
-            white-space:nowrap;cursor:pointer;
-          "
-        >
-          <span style="color:${tone.accentHex}">${station.aqi}</span>
-          <span style="font-family:'DM Sans',sans-serif;font-weight:500">${label}</span>
-        </button>
-      `;
-
-      const icon = L.divIcon({
-        className: 'atmosense-marker-icon',
-        html,
-        iconSize: [isCurrentLoc ? 170 : 110, 30],
-        iconAnchor: [isCurrentLoc ? 85 : 55, 15],
-      });
-
-      const marker = L.marker([station.latitude, station.longitude], { icon });
-      marker.on('click', () => onSelectRef.current(station.id));
-      marker.addTo(markersLayer);
-
-      if (showRadius) {
-        L.circle([station.latitude, station.longitude], {
-          radius: 4200,
-          color: isCurrentLoc ? '#0e7490' : tone.accentHex,
-          fillColor: tone.accentHex,
-          fillOpacity: isSelected ? 0.16 : 0.08,
-          weight: isSelected ? 1.5 : 1,
-        }).addTo(circlesLayer);
-      }
-    }
+    renderStationLayers({
+      stations,
+      selectedStationId: selectedStation.id,
+      showRadius,
+      markersLayer,
+      circlesLayer,
+      onSelect: (id) => onSelectRef.current(id),
+    });
   }, [stations, selectedStation.id, showRadius]);
 
-  // Fly smoothly to selected station
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map) return;
@@ -138,24 +96,13 @@ export function AirQualityMap({
     setGeoMessage('Locating nearest urban sensor...');
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        const { latitude, longitude } = pos.coords;
-        let nearest = stations[0];
-        let bestDist = Number.POSITIVE_INFINITY;
-        for (const st of stations) {
-          const dist = Math.hypot(st.latitude - latitude, st.longitude - longitude);
-          if (dist < bestDist) {
-            bestDist = dist;
-            nearest = st;
-          }
-        }
+        const nearest = findNearestStation(stations, pos.coords.latitude, pos.coords.longitude);
         if (nearest) {
           onSelectStation(nearest.id);
           setGeoMessage(`Centered on nearest station: ${nearest.city}.`);
         }
       },
-      () => {
-        setGeoMessage('Location access denied — select any city marker manually.');
-      },
+      () => setGeoMessage('Location access denied — select any city marker manually.'),
       { timeout: 6000 },
     );
   };
@@ -172,7 +119,6 @@ export function AirQualityMap({
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-      {/* Station Directory & Layer Controls */}
       <aside className="flex flex-col gap-4 lg:col-span-4">
         <div className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
           <div className="flex items-center justify-between gap-2">
@@ -183,7 +129,7 @@ export function AirQualityMap({
               type="button"
               onClick={() => setShowRadius((prev) => !prev)}
               aria-pressed={showRadius}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800 whitespace-nowrap shrink-0"
+              className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
             >
               <Layers className="h-3.5 w-3.5" aria-hidden="true" />
               {showRadius ? 'Hide Radius' : 'Show Radius'}
@@ -205,11 +151,12 @@ export function AirQualityMap({
           </button>
 
           {geoMessage && (
-            <p className="mt-2 text-xs text-slate-600 dark:text-slate-300">{geoMessage}</p>
+            <p role="status" className="mt-2 text-xs text-slate-600 dark:text-slate-300">
+              {geoMessage}
+            </p>
           )}
         </div>
 
-        {/* Active Station Inspector */}
         <div className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
           <div className="flex items-baseline justify-between gap-2">
             <div>
@@ -269,7 +216,6 @@ export function AirQualityMap({
           </button>
         </div>
 
-        {/* Station Quick Switch List */}
         <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
           <p className="mb-2.5 flex items-center gap-1.5 text-xs font-medium text-slate-600 dark:text-slate-300">
             <Compass className="h-3.5 w-3.5" aria-hidden="true" />
@@ -294,7 +240,7 @@ export function AirQualityMap({
                       {st.id === 'current-location' ? `My Location · ${st.city}` : st.city} ·{' '}
                       <span className="text-slate-500 dark:text-slate-400">{st.district}</span>
                     </span>
-                    <span className={`font-mono tabular-nums shrink-0 ${stTone.textClass}`}>
+                    <span className={`shrink-0 font-mono tabular-nums ${stTone.textClass}`}>
                       {st.aqi}
                     </span>
                   </button>
@@ -305,7 +251,6 @@ export function AirQualityMap({
         </div>
       </aside>
 
-      {/* Main Leaflet Map Viewport */}
       <section
         aria-label="Interactive urban air quality map"
         className="flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 lg:col-span-8"
