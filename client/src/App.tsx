@@ -5,19 +5,21 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { OfflineIndicator } from './components/OfflineIndicator';
 import { TopBar } from './components/TopBar';
 import { WorkspaceProvider, useWorkspace } from './context/AuthContext';
-import type { PersonaProfile } from './types/aqi';
 import type { ActiveTab, AirQualityStation, SensitivityProfile } from './types/airQuality';
 import { OFFLINE_FALLBACK_STATIONS } from './utils/airQuality';
-
-const THEME_STORAGE_KEY = 'atmosense-theme-v1';
-const CURRENT_LOCATION_STORAGE_KEY = 'atmosense-current-location-v1';
-const STATIONS_CACHE_KEY = 'atmosense-stations-cache-v1';
-
-interface CachedCurrentLocation {
-  station: AirQualityStation;
-  method: 'gps' | 'ip';
-  savedAt: string;
-}
+import {
+  THEME_STORAGE_KEY,
+  getBrowserCoordinates,
+  mergeStationsWithCurrent,
+  personaToSensitivity,
+  readCachedCurrentLocation,
+  readCachedStations,
+  readInitialTheme,
+  sensitivityToPersona,
+  writeCachedCurrentLocation,
+  writeCachedStations,
+  type CachedCurrentLocation,
+} from './utils/locationStorage';
 
 const AirQualityMap = lazy(() =>
   import('./components/AirQualityMap').then((mod) => ({ default: mod.AirQualityMap })),
@@ -47,106 +49,6 @@ function TabLoadingFallback() {
       Loading view…
     </div>
   );
-}
-
-function sensitivityToPersona(profile: SensitivityProfile): PersonaProfile {
-  if (profile === 'respiratory') return 'asthmatics';
-  if (profile === 'vulnerable') return 'elderly';
-  return 'general';
-}
-
-function personaToSensitivity(persona: PersonaProfile): SensitivityProfile {
-  if (persona === 'asthmatics') return 'respiratory';
-  if (persona === 'elderly' || persona === 'children') return 'vulnerable';
-  return 'general';
-}
-
-function readCachedCurrentLocation(): CachedCurrentLocation | null {
-  try {
-    const raw = window.localStorage.getItem(CURRENT_LOCATION_STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as Partial<CachedCurrentLocation>;
-    if (
-      parsed.station &&
-      typeof parsed.station.latitude === 'number' &&
-      typeof parsed.station.longitude === 'number' &&
-      typeof parsed.station.city === 'string'
-    ) {
-      return {
-        station: { ...parsed.station, id: 'current-location' },
-        method: parsed.method === 'gps' ? 'gps' : 'ip',
-        savedAt: typeof parsed.savedAt === 'string' ? parsed.savedAt : new Date().toISOString(),
-      };
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-function writeCachedCurrentLocation(entry: CachedCurrentLocation): void {
-  try {
-    window.localStorage.setItem(CURRENT_LOCATION_STORAGE_KEY, JSON.stringify(entry));
-  } catch {
-    // Ignore storage quota errors
-  }
-}
-
-function readCachedStations(): AirQualityStation[] | null {
-  try {
-    const raw = window.localStorage.getItem(STATIONS_CACHE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as AirQualityStation[];
-    if (Array.isArray(parsed) && parsed.length > 0) {
-      return parsed.filter((st) => st && typeof st.id === 'string' && typeof st.aqi === 'number');
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-function writeCachedStations(stations: AirQualityStation[]): void {
-  try {
-    window.localStorage.setItem(STATIONS_CACHE_KEY, JSON.stringify(stations));
-  } catch {
-    // Ignore storage quota errors
-  }
-}
-
-function readInitialTheme(): boolean {
-  try {
-    return window.localStorage.getItem(THEME_STORAGE_KEY) === 'dark';
-  } catch {
-    return false;
-  }
-}
-
-function mergeStationsWithCurrent(
-  baseStations: AirQualityStation[],
-  current: AirQualityStation | null,
-): AirQualityStation[] {
-  const withoutCurrent = baseStations.filter((st) => st.id !== 'current-location');
-  return current ? [{ ...current, id: 'current-location' }, ...withoutCurrent] : withoutCurrent;
-}
-
-function getBrowserCoordinates(timeoutMs = 7000): Promise<{ latitude: number; longitude: number }> {
-  return new Promise((resolve, reject) => {
-    if (typeof navigator === 'undefined' || !navigator.geolocation) {
-      reject(new Error('Browser geolocation unavailable'));
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        resolve({
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-        });
-      },
-      (err) => reject(err),
-      { enableHighAccuracy: false, timeout: timeoutMs, maximumAge: 300_000 },
-    );
-  });
 }
 
 function WorkspaceShell() {
@@ -182,7 +84,6 @@ function WorkspaceShell() {
     () => profile?.sensitivityProfile ?? 'general',
   );
   const [isDark, setIsDark] = useState<boolean>(readInitialTheme);
-
   const currentLocationRef = useRef<CachedCurrentLocation | null>(initialSavedLoc);
 
   useEffect(() => {
@@ -221,12 +122,8 @@ function WorkspaceShell() {
         writeCachedStations(merged);
         return merged;
       });
-      if (select) {
-        setSelectedStationId('current-location');
-      }
-      if (statusText) {
-        setLocationStatus(statusText);
-      }
+      if (select) setSelectedStationId('current-location');
+      if (statusText) setLocationStatus(statusText);
     },
     [],
   );
@@ -234,9 +131,7 @@ function WorkspaceShell() {
   const refreshSavedCurrentLocation = useCallback(
     async (forceRefresh = false): Promise<boolean> => {
       const saved = currentLocationRef.current;
-      if (!saved || (typeof navigator !== 'undefined' && !navigator.onLine)) {
-        return false;
-      }
+      if (!saved || (typeof navigator !== 'undefined' && !navigator.onLine)) return false;
 
       try {
         const refreshQuery = forceRefresh ? '&refresh=1' : '';
@@ -273,10 +168,8 @@ function WorkspaceShell() {
 
       setLocating(true);
       setLocationStatus('Detecting your location...');
-
       const refreshQuery = forceRefresh ? '&refresh=1' : '';
 
-      // 1. Browser GPS -> live hyperlocal Open-Meteo AQI + weather + reverse geocode
       try {
         const coords = await getBrowserCoordinates(userInitiated ? 9000 : 5500);
         const res = await fetch(
@@ -294,10 +187,9 @@ function WorkspaceShell() {
           }
         }
       } catch {
-        // GPS denied, blocked by iframe permissions, or timed out — try server IP geolocation
+        // GPS unavailable or denied — seamlessly fall back to server-side IP lookup
       }
 
-      // 2. Fallback: Server-side IP geolocation -> live Open-Meteo AQI + weather
       try {
         const res = await fetch(
           `/api/air-quality/detect-location${forceRefresh ? '?refresh=1' : ''}`,
@@ -339,18 +231,14 @@ function WorkspaceShell() {
         return;
       }
 
-      if (forceRefresh) {
-        setRefreshing(true);
-      } else {
-        setLoadingStations(true);
-      }
+      if (forceRefresh) setRefreshing(true);
+      else setLoadingStations(true);
       setFetchError(null);
 
       try {
         const response = await fetch(`/api/air-quality${forceRefresh ? '?refresh=1' : ''}`);
-        if (!response.ok) {
-          throw new Error(`Telemetry API returned ${response.status}`);
-        }
+        if (!response.ok) throw new Error(`Telemetry API returned ${response.status}`);
+
         const data = (await response.json()) as { stations?: AirQualityStation[] };
         if (Array.isArray(data.stations) && data.stations.length > 0) {
           if (currentLocationRef.current) {
@@ -361,7 +249,6 @@ function WorkspaceShell() {
             data.stations,
             currentLocationRef.current?.station ?? null,
           );
-
           writeCachedStations(merged);
           setStations(merged);
           setSelectedStationId((prev) =>
@@ -382,19 +269,14 @@ function WorkspaceShell() {
     [refreshSavedCurrentLocation],
   );
 
-  // Initial load: reuse saved browser location without re-detecting; refresh live readings if online
   useEffect(() => {
-    if (typeof navigator !== 'undefined' && !navigator.onLine) {
-      return;
-    }
-
+    if (typeof navigator !== 'undefined' && !navigator.onLine) return;
     void loadStations(false);
     if (!currentLocationRef.current) {
       void detectCurrentLocation({ userInitiated: false });
     }
   }, [loadStations, detectCurrentLocation]);
 
-  // Automatically refresh live AQI data when internet access returns
   useEffect(() => {
     const handleOnline = () => {
       setIsOnline(true);
@@ -404,9 +286,7 @@ function WorkspaceShell() {
         void detectCurrentLocation({ userInitiated: false });
       }
     };
-    const handleOffline = () => {
-      setIsOnline(false);
-    };
+    const handleOffline = () => setIsOnline(false);
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
@@ -435,7 +315,6 @@ function WorkspaceShell() {
         onRefresh={() => void loadStations(true)}
       />
 
-      {/* Slim Location Control Strip */}
       <div className="border-b border-slate-200/80 bg-white/75 dark:border-slate-800/80 dark:bg-slate-900/60">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2.5 px-4 py-2 sm:px-6 lg:px-8">
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 text-xs">

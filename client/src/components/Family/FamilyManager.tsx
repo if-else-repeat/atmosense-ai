@@ -1,31 +1,14 @@
-import {
-  AlertTriangle,
-  Lock,
-  Plus,
-  ShieldAlert,
-  ShieldCheck,
-  Trash2,
-  UserPlus,
-  Users,
-} from 'lucide-react';
-import { useEffect, useRef, useState, type FormEvent } from 'react';
-import {
-  ACTIVITY_PATTERN_LABELS,
-  AVATAR_PALETTE,
-  HEALTH_CONDITION_LABELS,
-  type ActivityPattern,
-  type FamilyMember,
-  type HealthCondition,
-  type SensitivityLevel,
-  type SymptomLogEntry,
-} from '../../types/family';
-import { getMemberInitials } from '../../utils/formatters';
+import { Lock, Trash2, UserPlus, Users } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { AVATAR_PALETTE, type FamilyMember, type SymptomLogEntry } from '../../types/family';
 import {
   eraseLocalEncryptedVault,
   loadLocalEncryptedVault,
   saveLocalEncryptedVault,
 } from '../../utils/healthCrypto';
+import { AddMemberForm, type NewMemberDraft } from './AddMemberForm';
 import { HealthInsights } from './HealthInsights';
+import { MemberCard } from './MemberCard';
 import { SymptomTracker } from './SymptomTracker';
 
 export interface FamilyManagerProps {
@@ -89,9 +72,10 @@ const DEFAULT_SYMPTOM_LOGS: SymptomLogEntry[] = [
   },
 ];
 
-const ALL_CONDITIONS: HealthCondition[] = ['asthma', 'copd', 'heart_disease', 'allergies'];
-const ALL_ACTIVITIES: ActivityPattern[] = ['school', 'work', 'outdoor_sports'];
-
+/**
+ * Household respiratory health workspace managing encrypted family profiles,
+ * daily symptom logs linked to live AQI, correlation insights, and GDPR erasure.
+ */
 export function FamilyManager({ currentAqi, locationName }: FamilyManagerProps) {
   const [members, setMembers] = useState<FamilyMember[]>(DEFAULT_MEMBERS);
   const [activeMemberId, setActiveMemberId] = useState<string>(DEFAULT_MEMBERS[0]!.id);
@@ -102,15 +86,6 @@ export function FamilyManager({ currentAqi, locationName }: FamilyManagerProps) 
   const [privacyNotice, setPrivacyNotice] = useState<string | null>(null);
   const hasUserMutatedRef = useRef<boolean>(false);
 
-  // Add-member form state
-  const [name, setName] = useState('');
-  const [age, setAge] = useState('34');
-  const [relationship, setRelationship] = useState('Child');
-  const [conditions, setConditions] = useState<HealthCondition[]>([]);
-  const [sensitivityLevel, setSensitivityLevel] = useState<SensitivityLevel>('medium');
-  const [activities, setActivities] = useState<ActivityPattern[]>(['school']);
-
-  // Hydrate from AES-256-GCM encrypted browser vault (with legacy plain localStorage fallback)
   useEffect(() => {
     let cancelled = false;
 
@@ -125,12 +100,8 @@ export function FamilyManager({ currentAqi, locationName }: FamilyManagerProps) 
             vault.members.some((m) => m.id === prev) ? prev : (vault.members[0]?.id ?? ''),
           );
         }
-        if (Array.isArray(vault.symptomLogs)) {
-          setSymptomLogs(vault.symptomLogs);
-        }
-        if (typeof vault.aiConsent === 'boolean') {
-          setAiConsent(vault.aiConsent);
-        }
+        if (Array.isArray(vault.symptomLogs)) setSymptomLogs(vault.symptomLogs);
+        if (typeof vault.aiConsent === 'boolean') setAiConsent(vault.aiConsent);
         return;
       }
 
@@ -149,12 +120,8 @@ export function FamilyManager({ currentAqi, locationName }: FamilyManagerProps) 
               parsedMembers.some((m) => m.id === prev) ? prev : (parsedMembers[0]?.id ?? ''),
             );
           }
-          if (Array.isArray(parsed.symptomLogs)) {
-            setSymptomLogs(parsed.symptomLogs);
-          }
-          if (typeof parsed.aiConsent === 'boolean') {
-            setAiConsent(parsed.aiConsent);
-          }
+          if (Array.isArray(parsed.symptomLogs)) setSymptomLogs(parsed.symptomLogs);
+          if (typeof parsed.aiConsent === 'boolean') setAiConsent(parsed.aiConsent);
         }
       } catch {
         // Ignore storage read errors
@@ -176,11 +143,7 @@ export function FamilyManager({ currentAqi, locationName }: FamilyManagerProps) 
     try {
       window.localStorage.setItem(
         LOCAL_STORAGE_KEY,
-        JSON.stringify({
-          members: nextMembers,
-          symptomLogs: nextLogs,
-          aiConsent: nextConsent,
-        }),
+        JSON.stringify({ members: nextMembers, symptomLogs: nextLogs, aiConsent: nextConsent }),
       );
     } catch {
       // Ignore storage write errors
@@ -194,49 +157,17 @@ export function FamilyManager({ currentAqi, locationName }: FamilyManagerProps) 
 
   const activeMember = members.find((m) => m.id === activeMemberId) ?? members[0] ?? null;
 
-  const toggleCondition = (cond: HealthCondition) => {
-    setConditions((prev) =>
-      prev.includes(cond) ? prev.filter((item) => item !== cond) : [...prev, cond],
-    );
-  };
-
-  const toggleActivity = (act: ActivityPattern) => {
-    setActivities((prev) =>
-      prev.includes(act) ? prev.filter((item) => item !== act) : [...prev, act],
-    );
-  };
-
-  const handleAddMember = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const trimmedName = name.trim();
-    const parsedAge = Number(age);
-    if (!trimmedName || !Number.isFinite(parsedAge) || parsedAge < 0 || parsedAge > 120) {
-      return;
-    }
-
+  const handleAddMember = (draft: NewMemberDraft) => {
     const newMember: FamilyMember = {
       id: `member-${Date.now().toString(36)}`,
-      name: trimmedName,
-      age: Math.round(parsedAge),
-      relationship: relationship.trim() || 'Family',
-      healthConditions: conditions,
-      sensitivityLevel,
-      activityPatterns: activities,
+      ...draft,
       avatarColor: AVATAR_PALETTE[members.length % AVATAR_PALETTE.length]!,
       createdAt: Date.now(),
     };
-
     const nextMembers = [...members, newMember];
     setMembers(nextMembers);
     setActiveMemberId(newMember.id);
     persistLocal(nextMembers, symptomLogs, aiConsent);
-
-    setName('');
-    setAge('30');
-    setRelationship('Child');
-    setConditions([]);
-    setSensitivityLevel('medium');
-    setActivities(['school']);
     setShowAddForm(false);
   };
 
@@ -245,17 +176,12 @@ export function FamilyManager({ currentAqi, locationName }: FamilyManagerProps) 
     const nextLogs = symptomLogs.filter((l) => l.memberId !== memberId);
     setMembers(nextMembers);
     setSymptomLogs(nextLogs);
-    if (activeMemberId === memberId) {
-      setActiveMemberId(nextMembers[0]?.id ?? '');
-    }
+    if (activeMemberId === memberId) setActiveMemberId(nextMembers[0]?.id ?? '');
     persistLocal(nextMembers, nextLogs, aiConsent);
   };
 
   const handleAddSymptomLog = (entry: Omit<SymptomLogEntry, 'id'>) => {
-    const created: SymptomLogEntry = {
-      ...entry,
-      id: `symptom-${Date.now().toString(36)}`,
-    };
+    const created: SymptomLogEntry = { ...entry, id: `symptom-${Date.now().toString(36)}` };
     const nextLogs = [created, ...symptomLogs];
     setSymptomLogs(nextLogs);
     persistLocal(members, nextLogs, aiConsent);
@@ -292,7 +218,6 @@ export function FamilyManager({ currentAqi, locationName }: FamilyManagerProps) 
 
   return (
     <div className="min-w-0 space-y-6">
-      {/* Section Header */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h2 className="flex items-center gap-2 text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
@@ -316,7 +241,6 @@ export function FamilyManager({ currentAqi, locationName }: FamilyManagerProps) 
         </button>
       </div>
 
-      {/* Privacy & Encryption Summary Strip */}
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-xs dark:border-slate-800 dark:bg-slate-900">
         <div className="flex flex-wrap items-center gap-3 text-slate-600 dark:text-slate-300">
           <span className="inline-flex items-center gap-1.5 font-medium text-emerald-800 dark:text-emerald-300">
@@ -372,167 +296,10 @@ export function FamilyManager({ currentAqi, locationName }: FamilyManagerProps) 
         </div>
       )}
 
-      {/* Add Family Member Form */}
       {showAddForm && (
-        <form
-          onSubmit={handleAddMember}
-          aria-label="Add family member form"
-          className="rounded-xl border border-slate-200 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900"
-        >
-          <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">
-            New Family Member Profile
-          </h3>
-
-          <div className="mt-4 grid gap-4 sm:grid-cols-3">
-            <div>
-              <label
-                htmlFor="member-name"
-                className="block text-xs font-medium text-slate-700 dark:text-slate-300"
-              >
-                Full Name
-              </label>
-              <input
-                id="member-name"
-                type="text"
-                required
-                maxLength={60}
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="e.g., Rohan"
-                className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-cyan-700 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="member-age"
-                className="block text-xs font-medium text-slate-700 dark:text-slate-300"
-              >
-                Age
-              </label>
-              <input
-                id="member-age"
-                type="number"
-                min={0}
-                max={120}
-                required
-                value={age}
-                onChange={(e) => setAge(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-cyan-700 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="member-relationship"
-                className="block text-xs font-medium text-slate-700 dark:text-slate-300"
-              >
-                Relationship
-              </label>
-              <select
-                id="member-relationship"
-                value={relationship}
-                onChange={(e) => setRelationship(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-cyan-700 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-              >
-                <option value="Child">Child</option>
-                <option value="Parent">Parent</option>
-                <option value="Spouse">Spouse / Partner</option>
-                <option value="Grandparent">Grandparent</option>
-                <option value="Self">Self</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="mt-4 grid gap-4 sm:grid-cols-3">
-            <fieldset className="min-w-0">
-              <legend className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                Health Conditions
-              </legend>
-              <div className="mt-2 space-y-1.5">
-                {ALL_CONDITIONS.map((cond) => (
-                  <label
-                    key={cond}
-                    className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={conditions.includes(cond)}
-                      onChange={() => toggleCondition(cond)}
-                      className="h-4 w-4 rounded border-slate-300 text-cyan-700"
-                    />
-                    {HEALTH_CONDITION_LABELS[cond]}
-                  </label>
-                ))}
-              </div>
-            </fieldset>
-
-            <fieldset className="min-w-0">
-              <legend className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                Sensitivity Level
-              </legend>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {(['low', 'medium', 'high'] as SensitivityLevel[]).map((level) => (
-                  <button
-                    key={level}
-                    type="button"
-                    onClick={() => setSensitivityLevel(level)}
-                    aria-pressed={sensitivityLevel === level}
-                    className={`rounded-lg border px-3 py-1.5 text-xs font-medium capitalize transition-colors ${
-                      sensitivityLevel === level
-                        ? 'border-cyan-700 bg-cyan-50 text-cyan-900 dark:border-cyan-500 dark:bg-cyan-950/60 dark:text-cyan-200'
-                        : 'border-slate-200 bg-white text-slate-600 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300'
-                    }`}
-                  >
-                    {level}
-                  </button>
-                ))}
-              </div>
-            </fieldset>
-
-            <fieldset className="min-w-0">
-              <legend className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                Activity Patterns
-              </legend>
-              <div className="mt-2 space-y-1.5">
-                {ALL_ACTIVITIES.map((act) => (
-                  <label
-                    key={act}
-                    className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={activities.includes(act)}
-                      onChange={() => toggleActivity(act)}
-                      className="h-4 w-4 rounded border-slate-300 text-cyan-700"
-                    />
-                    {ACTIVITY_PATTERN_LABELS[act]}
-                  </label>
-                ))}
-              </div>
-            </fieldset>
-          </div>
-
-          <div className="mt-5 flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => setShowAddForm(false)}
-              className="rounded-lg border border-slate-300 px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="inline-flex items-center gap-1.5 rounded-lg bg-cyan-700 px-4 py-2 text-xs font-medium text-white hover:bg-cyan-800"
-            >
-              <Plus className="h-3.5 w-3.5" aria-hidden="true" />
-              Save Member Profile
-            </button>
-          </div>
-        </form>
+        <AddMemberForm onSubmit={handleAddMember} onCancel={() => setShowAddForm(false)} />
       )}
 
-      {/* Quick-Switch Member Profile Strip */}
       <section aria-label="Family member profiles">
         {members.length === 0 ? (
           <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center dark:border-slate-700 dark:bg-slate-900">
@@ -555,93 +322,20 @@ export function FamilyManager({ currentAqi, locationName }: FamilyManagerProps) 
           </div>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {members.map((member) => {
-              const isSelected = activeMember?.id === member.id;
-              const isVulnerable = member.sensitivityLevel === 'high';
-              return (
-                <div
-                  key={member.id}
-                  className={`rounded-xl border p-4 transition-colors ${
-                    isSelected
-                      ? 'border-cyan-700 bg-cyan-50/40 dark:border-cyan-500 dark:bg-cyan-950/25'
-                      : 'border-slate-200 bg-white hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-slate-700'
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setActiveMemberId(member.id)}
-                      aria-pressed={isSelected}
-                      className="flex flex-1 items-center gap-3 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-700"
-                    >
-                      <span
-                        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold text-white"
-                        style={{ backgroundColor: member.avatarColor }}
-                        aria-hidden="true"
-                      >
-                        {getMemberInitials(member.name)}
-                      </span>
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
-                          {member.name}
-                        </p>
-                        <p className="text-xs text-slate-500 dark:text-slate-400">
-                          {member.relationship} · Age {member.age}
-                        </p>
-                      </div>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveMember(member.id)}
-                      aria-label={`Remove ${member.name}`}
-                      className="rounded-md p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-700 dark:hover:bg-rose-950/50 dark:hover:text-rose-300"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-                    </button>
-                  </div>
-
-                  <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-                    {isVulnerable ? (
-                      <span className="inline-flex items-center gap-1 rounded-md border border-rose-200 bg-rose-50 px-2 py-0.5 font-medium text-rose-900 dark:border-rose-900/60 dark:bg-rose-950/60 dark:text-rose-200">
-                        <ShieldAlert className="h-3.5 w-3.5" aria-hidden="true" />
-                        Vulnerable Person
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 font-medium capitalize text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
-                        <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />
-                        {member.sensitivityLevel} sensitivity
-                      </span>
-                    )}
-
-                    {member.healthConditions.length > 0 && (
-                      <span className="text-slate-600 dark:text-slate-400">
-                        {member.healthConditions.map((c) => HEALTH_CONDITION_LABELS[c]).join(', ')}
-                      </span>
-                    )}
-                  </div>
-
-                  {member.activityPatterns.length > 0 && (
-                    <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-                      Routine:{' '}
-                      {member.activityPatterns.map((a) => ACTIVITY_PATTERN_LABELS[a]).join(' · ')}
-                    </p>
-                  )}
-
-                  {isVulnerable && currentAqi >= 100 && (
-                    <p className="mt-2 flex items-center gap-1 text-xs font-medium text-amber-800 dark:text-amber-300">
-                      <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                      Elevated exposure risk at current AQI ({Math.round(currentAqi)})
-                    </p>
-                  )}
-                </div>
-              );
-            })}
+            {members.map((member) => (
+              <MemberCard
+                key={member.id}
+                member={member}
+                isSelected={activeMember?.id === member.id}
+                currentAqi={currentAqi}
+                onSelect={setActiveMemberId}
+                onRemove={handleRemoveMember}
+              />
+            ))}
           </div>
         )}
       </section>
 
-      {/* Active Member Workspace: Symptom Tracker + AI Health Insights */}
       {activeMember && (
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
           <div className="min-w-0 lg:col-span-7">

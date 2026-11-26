@@ -3,9 +3,9 @@
 > **Breathe with foresight.** Hyperlocal multi-source air quality telemetry, atmospheric inversion physics, family respiratory protection, and evidence-based pulmonary guidance—engineered for everyday urban resilience.
 
 [![CI Pipeline](https://img.shields.io/badge/CI-Passing-16a34a?style=flat-square&logo=githubactions&logoColor=white)](./TESTING.md)
-[![Test Suite](https://img.shields.io/badge/Tests-146%20Passing-16a34a?style=flat-square&logo=vitest&logoColor=white)](./TESTING.md)
-[![Code Coverage](https://img.shields.io/badge/Coverage-89.0%25%20Stmts%20%7C%2091.6%25%20Lines-0e7490?style=flat-square)](./TESTING.md)
-[![Initial Bundle](https://img.shields.io/badge/Initial%20Bundle-171.4%20KB%20gzip-0e7490?style=flat-square)](./EFFICIENCY.md)
+[![Test Suite](https://img.shields.io/badge/Tests-158%20Passing-16a34a?style=flat-square&logo=vitest&logoColor=white)](./TESTING.md)
+[![Code Coverage](https://img.shields.io/badge/Coverage-88.3%25%20Stmts%20%7C%2090.8%25%20Lines-0e7490?style=flat-square)](./TESTING.md)
+[![Initial Bundle](https://img.shields.io/badge/Initial%20Bundle-171.8%20KB%20gzip-0e7490?style=flat-square)](./EFFICIENCY.md)
 [![Accessibility](https://img.shields.io/badge/WCAG%202.2-AA%20Compliant-2563eb?style=flat-square)](./ACCESSIBILITY.md)
 [![Security](https://img.shields.io/badge/Security-OWASP%20%2B%20STRIDE%20Hardened-0f172a?style=flat-square)](./SECURITY.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-0284c7?style=flat-square)](#license)
@@ -17,7 +17,7 @@
 1. [Problem Statement](#problem-statement)
 2. [The AtmoSense AI Solution](#the-atmosense-ai-solution)
 3. [Visual Walkthrough & Screenshots](#visual-walkthrough--screenshots)
-4. [24 Core & Differentiating Features](#24-core--differentiating-features)
+4. [26 Core & Differentiating Features](#26-core--differentiating-features)
 5. [System Architecture](#system-architecture)
 6. [Technology Stack](#technology-stack)
 7. [Getting Started](#getting-started)
@@ -32,32 +32,36 @@
 
 ## Problem Statement
 
-Urban air pollution is one of the largest preventable environmental health risks in the modern world. According to the **World Health Organization (WHO)**, 99% of the global population breathes air that exceeds the 2021 WHO Global Air Quality Guidelines, contributing to an estimated **6.7 million premature deaths annually** from ambient and household fine particulate matter ($\text{PM}_{2.5}$), nitrogen dioxide ($\text{NO}_2$), and ground-level ozone ($\text{O}_3$).
+Urban air pollution and severe winter smog episodes represent one of the largest preventable environmental health risks in the modern world. According to the **World Health Organization (WHO)**, 99% of the global population breathes air exceeding the 2021 WHO Global Air Quality Guidelines, contributing to an estimated **6.7 million premature deaths annually** from fine particulate matter ($\text{PM}_{2.5}$), nitrogen dioxide ($\text{NO}_2$), and ground-level ozone ($\text{O}_3$).
 
-> _"Build an intelligent, resilient urban air quality assistant that transforms raw multi-pollutant sensor data into personalized, scientifically grounded, accessible respiratory protection—empowering families, vulnerable individuals, and communities to act before hazardous exposure occurs."_
+> **[Challenge 6] Urban Air Quality Assistant**
+>
+> _"Create a GenAI-powered assistant that helps families and communities navigate severe winter smog and urban air pollution. The application should suggest low-emission daily routines, indoor air quality hacks, and sustainable alternatives tailored to their location and lifestyle, while clearly explaining the direct impact of their choices."_
 
-Despite the proliferation of weather apps displaying a single generic AQI number, urban residents still confront **six structural failures** in existing air quality tools:
+Despite weather apps displaying a single generic AQI number, families and urban communities confronting winter thermal inversions still face **six structural gaps**:
 
-1. **Single-Source Blindness & Sensor Drift**: Most consumer apps rely on a single upstream feed. When a neighborhood reference monitor goes offline, drifts by >50%, or suffers API deprecation (such as OpenAQ v2's retirement), users either see stale data or an error screen.
-2. **No Atmospheric Inversion Awareness**: A static AQI reading at 07:00 fails to explain _why_ urban smog spikes during calm, cool mornings (nocturnal radiation inversion trapping traffic emissions beneath a thermal lid) or _when_ solar convection breaks the inversion layer to open a safer afternoon outdoor window (typically 11:00–16:00).
-3. **One-Size-Fits-All Advisories**: An AQI of 115 ("Unhealthy for Sensitive Groups") carries fundamentally different clinical implications for a 9-year-old child with allergic asthma, a 71-year-old grandparent with ischemic heart disease, and a healthy adult runner—yet standard apps surface the same generic sentence to everyone.
-4. **Disconnected Symptom & Exposure History**: Families managing asthma, COPD, or seasonal allergies lack a private, structured way to correlate daily coughing, wheezing, eye irritation, and dyspnea logs against timestamped ambient AQI spikes—and cannot easily export clinician-ready summaries for pulmonologist appointments.
-5. **Environmental Justice Blind Spots**: Neighborhood AQI disparities inside the same metropolitan region frequently exceed 3×–4× between green residential zones and industrial/highway corridors. Without crowdsourced hyperlocal visibility and neighborhood disparity mapping, communities cannot coordinate mutual aid or low-emission pledges.
-6. **Fragility Under Real-World Constraints**: Client-side LLM keys leak secrets, uncached API calls exhaust quotas, bloated bundles fail on 3G mobile networks, and color-only AQI badges exclude roughly 1 in 12 men with color vision deficiency.
+1. **No Actionable Low-Emission Routines**: A static AQI reading at 07:00 fails to explain _why_ winter smog spikes under morning radiation inversions (06:00–10:00) or how to re-time commutes, school runs, and outdoor exercise into the 11:00–16:00 solar convection mixing window.
+2. **Missing Practical Indoor Air Quality (IAQ) Hacks**: Commercial HEPA purifiers are often unaffordable during severe smog episodes, yet few tools calculate room-specific DIY Corsi-Rosenthal MERV-13 CADR/ACH clear times, draft-sealing priorities, or gas-stove exhaust protocols.
+3. **Unquantified Sustainable Alternatives**: Residents are rarely shown how switching their specific commute mode, heating/cooking fuel, or errand consolidation translates into concrete personal lung $\text{PM}_{2.5}$ reductions, monthly $\text{CO}_2$/$\text{NO}_x$ avoided, and neighborhood-scale airshed relief.
+4. **One-Size-Fits-All Advisories & Disconnected Family Symptom Logs**: A child with allergic asthma, a senior with cardiovascular risk, and a healthy adult runner require distinct clinical thresholds and private, AQI-linked symptom tracking.
+5. **Single-Source Sensor Blindness & Environmental Justice Gaps**: Relying on one feed breaks when stations drift (>50% error) or retire (HTTP 410 Gone), while hiding 3×–4× neighborhood pollution disparities across districts.
+6. **Security, Performance & Accessibility Fragility**: Client-side LLM keys leak secrets, heavy bundles stall on mobile networks, and color-only AQI indicators exclude colorblind residents.
 
 ---
 
 ## The AtmoSense AI Solution
 
-**AtmoSense AI** is a full-stack, security-hardened, offline-capable Progressive Web Application (PWA) built with **React 19, TypeScript, Tailwind CSS v4, Express 5, Leaflet/OpenStreetMap, AES-256-GCM browser-local storage, and server-side Google Gemini AI** with deterministic scientific fallback heuristics.
+**AtmoSense AI** is a full-stack, security-hardened, offline-capable Progressive Web Application (PWA) built with **React 19, TypeScript, Tailwind CSS v4, Express 5, Leaflet/OpenStreetMap, AES-256-GCM browser-local storage, and server-side Google Gemini AI** with deterministic atmospheric physics fallbacks.
 
-Rather than merely echoing an AQI integer, AtmoSense AI establishes an end-to-end **Atmospheric Intelligence Pipeline**:
+AtmoSense AI directly delivers every objective of **Challenge 6** through an integrated **Urban Winter Smog Protection Pipeline**:
 
-- **Live Multi-Source Telemetry Fusion (`WAQI` + `OpenAQ` + `OpenWeather` + `Open-Meteo`)**: Automatically detects the user's current coordinates (browser GPS primary with seamless server-side IP geolocation fallback), reverse-geocodes the exact neighborhood, queries upstream air-quality providers in parallel with reliability weighting, dampens >50% sensor outliers, silently circuit-breaks permanently retired endpoints (HTTP 410 Gone), and caches normalized responses in a SHA-256 100-entry 10-minute LRU cache.
-- **Exact US EPA & WHO 2021 Calculation Engine**: Implements official US EPA linear breakpoint interpolation across $\text{PM}_{2.5}$, $\text{PM}_{10}$, $\text{NO}_2$, $\text{CO}$, and $\text{O}_3$, computes WHO 2021 24-hour guideline exceedance ratios ($\text{PM}_{2.5} > 15\,\mu\text{g/m}^3$), detects thermal inversion risk from diurnal meteorology, and identifies the lowest-exposure outdoor window.
-- **Server-Side Pulmonary AI & Deterministic Fallback**: Exposes five Zod-validated, prompt-injection-sanitized, SHA-256-cached, rate-limited (`30 req/min/user`) Gemini endpoints—personalized daily routines, conversational pulmonary assistant, emergency bulletins, multimodal smog/AQI-meter/mask-fit image analysis, and symptom-AQI correlation insights. If the LLM is unreachable or unconfigured, a deterministic atmospheric physics fallback engine guarantees uninterrupted, WHO/EPA-cited guidance.
-- **Privacy-First Family Health Protection**: Tracks multi-member household profiles with sensitivity badges, logs five clinical respiratory symptoms linked automatically to current ambient AQI, requires explicit user opt-in before transmitting de-identified symptom data for AI correlation, encrypts local health data with AES-256-GCM, exports printable PDF visit reports for physicians, and provides one-click GDPR complete data erasure.
-- **Community Resilience & Environmental Justice Hub**: Enables crowdsourced AQI reporting, photo sharing of local visibility/smog, neighborhood disparity comparison heatmaps, geotargeted emergency broadcasts, streak/badge gamification, opt-in anonymous leaderboards (accessible in tabular form), and collective $\text{CO}_2$ avoidance pledges.
+- **Winter Smog Action Hub (Location + Lifestyle Tailored)**: Directly on the main monitor view (`WinterSmogActionHub.tsx` + `smogImpactEngine.ts`), families configure their **Primary Commute, Heating/Cooking Fuel, Home Type, and Household Size** to unlock three interactive pillars:
+  1. **Sustainable Alternatives & Direct Impact Simulator** (`SustainableAlternatives.tsx`): Toggles tailored low-emission shifts (transit/carpool, cold-start elimination, induction/clean heating, batching trips, neighborhood airshed pledges) while live-calculating **Family Lung $\text{PM}\_{2.5}$ Exposure Reduction (%)**, **Monthly $\text{CO}\_2$ Avoided (kg)**, **Local $\text{PM}\_{2.5}+\text{NO}\_x$ Cut (g)**, and **500-Family Neighborhood Scaling** with plain-language impact explanations.
+  2. **Indoor Air Quality (IAQ) Hacks & DIY Corsi-Rosenthal Calculator** (`IndoorAirHacks.tsx`): Interactive room-area slider computing exact MERV-13 box-fan **CADR**, **Air Changes per Hour (ACH)**, and **90% smoke clear-time (minutes)** alongside door-sweep sealing, range-hood venting, and a persisted household action checklist.
+  3. **GenAI Low-Emission Daily Routine Optimizer** (`RoutineOptimizer.tsx` + `POST /api/ai/routine`): Generates persona- and lifestyle-aware time-blocked schedules accounting for winter thermal inversions (06:00–10:00), midday vertical dispersion (11:00–16:00), and evening settling (17:00–20:00).
+- **Live Multi-Source Telemetry Fusion (`WAQI` + `OpenAQ` + `OpenWeather` + `Open-Meteo`)**: Automatically detects and caches the user's location (GPS primary + IP fallback, auto-refreshed when online), queries upstream providers in parallel with reliability weighting, dampens >50% sensor outliers, silently circuit-breaks retired endpoints (HTTP 410), and caches normalized responses in a SHA-256 100-entry 10-minute LRU cache.
+- **Exact US EPA & WHO 2021 Calculation Engine**: Implements piecewise linear breakpoint interpolation across $\text{PM}_{2.5}$, $\text{PM}_{10}$, $\text{NO}_2$, $\text{CO}$, and $\text{O}_3$, computes WHO 2021 24-hour guideline exceedance ratios, and explains diurnal thermal inversion risk in plain language.
+- **Privacy-First Family Health & Community Resilience**: Zero-sign-in browser-local persistence with AES-256-GCM encryption for household profiles and 5-symptom AQI-linked logs, explicit AI consent controls, clinician PDF export, GDPR one-click erasure, plus a Community Hub featuring crowdsourced smog photos, neighborhood environmental justice disparity heatmaps, geotargeted broadcasts, and collective $\text{CO}_2$ pledges.
 
 ---
 
@@ -65,9 +69,9 @@ Rather than merely echoing an AQI integer, AtmoSense AI establishes an end-to-en
 
 All screenshots below were captured directly from the live running AtmoSense AI application in headless Chromium at `1440×900` with zero console errors or warnings.
 
-### 1. Real-Time Air Quality Monitor (Light Mode)
+### 1. Real-Time Air Quality Monitor & Winter Smog Action Hub (Light Mode)
 
-Auto-detects the user's current location (`My Location`), fuses live `WAQI+OpenWeather` telemetry, displays accessible numeric AQI with icon + text status badges, renders five memoized pollutant cards with trend sparklines and WHO/EPA threshold bars, and plots a lazy-loaded native SVG 24-hour forecast highlighting the 11:00–16:00 solar convection mixing window.
+Auto-detects and caches the user's current location (`My Location`), fuses live `WAQI+OpenWeather` telemetry, displays accessible numeric AQI with icon + text status badges, renders five memoized pollutant cards, plots a lazy-loaded native SVG 24-hour forecast highlighting the 11:00–16:00 convection window, and mounts the **Winter Smog Action Hub** (Sustainable Alternatives & Direct Impact, Indoor Air Hacks, and Low-Emission Daily Routine).
 
 ![AtmoSense AI Real-Time Dashboard — Light Mode](./docs/screenshots/dashboard-light.png)
 
@@ -91,34 +95,36 @@ Manage vulnerable household members, log coughing/wheezing/eye irritation/shortn
 
 ---
 
-## 24 Core & Differentiating Features
+## 26 Core & Differentiating Features
 
-| #   | Category                  | Feature                                           | Engineering Implementation                                                                                                                                                     |
-| --- | ------------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 1   | **Location Intelligence** | Automatic GPS + IP Geolocation                    | Browser `navigator.geolocation` primary with automatic server-side IP fallback (`ipwho.is` → `geojs.io`) and reverse geocoding (`BigDataCloud` → `Nominatim`).                 |
-| 2   | **Telemetry Engine**      | Multi-Source Weighted Fusion                      | Parallel ingestion of WAQI (`0.95`), OpenAQ (`0.85`), and OpenWeather (`0.70`) with full per-source provenance audit trails.                                                   |
-| 3   | **Data Integrity**        | >50% Outlier Detection & Dampening                | Computes consensus baseline across active providers and down-weights divergent sensors (`×0.2` weight factor) so broken monitors cannot skew advisories.                       |
-| 4   | **Resilience**            | Silent HTTP 410 Circuit-Breaker                   | Detects permanently retired endpoints (`410 Gone`, e.g., OpenAQ v2), circuit-breaks them in memory, and eliminates recurring latency and log noise.                            |
-| 5   | **Scientific Accuracy**   | Official US EPA Breakpoint Calculator             | Exact piecewise linear interpolation for $\text{PM}_{2.5}$, $\text{PM}_{10}$, $\text{NO}_2$, $\text{CO}$, and $\text{O}_3$ plus WHO 2021 24h guideline exceedance multipliers. |
-| 6   | **Atmospheric Physics**   | Thermal Inversion Risk Indicator                  | Evaluates diurnal inversion trapping (06:00–10:00 morning lid, 17:00–20:00 evening settling) vs. 11:00–16:00 solar convection mixing in plain language.                        |
-| 7   | **Visualization**         | Zero-Dependency Native SVG Forecast               | Lazy-loaded 24-hour trajectory chart with interactive hover/keyboard scrubbing, convection window band, and `.sr-only` accessible summary table.                               |
-| 8   | **Mobile UX**             | Pull-to-Refresh & 10-Min Auto-Refresh             | Touch pull-to-refresh gesture handler on mobile viewports plus background 10-minute polling aligned with server LRU cache TTL.                                                 |
-| 9   | **Offline PWA**           | Workbox Service Worker & Offline Banner           | Precaches app shell, caches `/api/air-quality` with `NetworkFirst`, displays live online/offline banner, and supports standalone home-screen installation.                     |
-| 10  | **Server-Side AI**        | Personalized Daily Routine Optimizer              | Generates time-blocked safe/caution/danger schedules tailored to `children`, `elderly`, `asthmatics`, or `general` personas with mask/HEPA recommendations.                    |
-| 11  | **Server-Side AI**        | Conversational Pulmonary Assistant                | Context-aware multi-turn chat injecting live zone pollutants, persona profile, and WHO/EPA citations with strict prompt-injection sanitization.                                |
-| 12  | **Server-Side AI**        | Emergency Severity Advisory Generator             | Produces structured `moderate`, `severe`, or `critical` public health bulletins in multiple languages for acute smog or wildfire smoke episodes.                               |
-| 13  | **Multimodal AI**         | Vision Analysis (`smog` / `aqi-display` / `mask`) | Analyzes base64 photographs (up to 6 MB route limit) to estimate haze severity, read physical AQI monitor screens, or check N95/KN95 seal fit.                                 |
-| 14  | **Clinical Analytics**    | AI Symptom–AQI Correlation Engine                 | Correlates logged household symptom timestamps and severities against ambient AQI history and classifies correlation strength (`weak`, `moderate`, `strong`).                  |
-| 15  | **Zero-Downtime AI**      | Deterministic Heuristic Fallback                  | Automatically engages scientifically calibrated atmospheric heuristics whenever Gemini is unconfigured, throttled, or returns invalid JSON.                                    |
-| 16  | **Family Health**         | Multi-Member Household Profiles                   | Color-coded avatars, age/relationship tags, clinical conditions (asthma, COPD, heart disease, allergies), activity schedules, and high-sensitivity badges.                     |
-| 17  | **Family Health**         | 5-Symptom Timestamped Logger                      | Captures coughing, wheezing, eye irritation, shortness of breath, and headache (`none`/`mild`/`moderate`/`severe`) automatically linked to live AQI.                           |
-| 18  | **Family Health**         | Clinician PDF Export & GDPR Erasure               | Generates printable doctor-visit health summaries, enforces explicit AI consent checkbox, encrypts local data, and provides one-click GDPR full wipe.                          |
-| 19  | **Community**             | Crowdsourced AQI & Smog Photo Feed                | Allows residents to submit hyperlocal AQI readings and local visibility photos to fill gaps between sparse government monitoring stations.                                     |
-| 20  | **Environmental Justice** | Neighborhood Disparity Heatmap                    | Compares average AQI across urban districts and surfaces actionable inequity alerts (e.g., _"Zone A averages 45 AQI vs. Zone B at 180 AQI"_).                                  |
-| 21  | **Community Safety**      | Geotargeted Emergency Broadcasts                  | Publishes zone-scoped severe pollution alerts with shelter-in-place and vulnerable-neighbor check-in protocols.                                                                |
-| 22  | **Behavioral Design**     | Gamification, Streaks & Eco-Pledges               | Tracks daily check-in streaks, 6 unlockable achievement badges, opt-in anonymous neighborhood leaderboards (table-accessible), and collective $\text{CO}_2$ pledges.           |
-| 23  | **Voice Accessibility**   | Hands-Free Voice Interface                        | Supports Web Speech API voice queries and spoken AQI readouts for visually impaired users and hands-free morning checks.                                                       |
-| 24  | **Cloud Persistence**     | Firebase Auth + Firestore Saved Zones             | Optional Google Sign-In syncing saved monitoring zones, alert thresholds, sensitivity preferences, and archived advisories protected by strict Firestore security rules.       |
+| #   | Category                  | Feature                                             | Engineering Implementation                                                                                                                                                                                                                                                    |
+| --- | ------------------------- | --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | **Challenge 6 Core**      | **Sustainable Alternatives & Direct Impact Engine** | Interactive lifestyle profile (commute, heating/cooking fuel, home type, household size) quantifying family lung $\text{PM}_{2.5}$ reduction, monthly $\text{CO}_2$/$\text{NO}_x$ cut, and 500-family airshed scaling (`smogImpactEngine.ts`, `SustainableAlternatives.tsx`). |
+| 2   | **Challenge 6 Core**      | **Indoor Air Quality (IAQ) Hacks & DIY CADR Math**  | Room-area slider calculating Corsi-Rosenthal MERV-13 CADR, ACH, and 90% smoke clear time plus draft-sealing, exhaust-hood venting, and persisted household checklist (`IndoorAirHacks.tsx`).                                                                                  |
+| 3   | **Challenge 6 Core**      | **Low-Emission Daily Routine Optimizer**            | Server-side GenAI + atmospheric inversion schedule generator (`RoutineOptimizer.tsx` + `POST /api/ai/routine`) tailored to location, live AQI, sensitivity persona, and household lifestyle.                                                                                  |
+| 4   | **Location Intelligence** | Automatic GPS + IP Geolocation + Browser Cache      | Browser `navigator.geolocation` primary with IP fallback (`ipwho.is` → `geojs.io`), reverse geocoding, and `localStorage` caching with automatic online refresh (`locationStorage.ts`).                                                                                       |
+| 5   | **Telemetry Engine**      | Multi-Source Weighted Fusion                        | Parallel ingestion of WAQI (`0.95`), OpenAQ (`0.85`), and OpenWeather (`0.70`) with full per-source provenance audit trails (`aqiService.ts`).                                                                                                                                |
+| 6   | **Data Integrity**        | >50% Outlier Detection & Dampening                  | Computes consensus baseline across active providers and down-weights divergent sensors (`×0.2` weight factor) so broken monitors cannot skew advisories.                                                                                                                      |
+| 7   | **Resilience**            | Silent HTTP 410 Circuit-Breaker                     | Detects permanently retired endpoints (`410 Gone`, e.g., OpenAQ v2), circuit-breaks them in memory, and eliminates recurring latency and log noise.                                                                                                                           |
+| 8   | **Scientific Accuracy**   | Official US EPA Breakpoint Calculator               | Exact piecewise linear interpolation for $\text{PM}_{2.5}$, $\text{PM}_{10}$, $\text{NO}_2$, $\text{CO}$, and $\text{O}_3$ plus WHO 2021 24h guideline exceedance multipliers.                                                                                                |
+| 9   | **Atmospheric Physics**   | Thermal Inversion Risk Indicator                    | Evaluates diurnal inversion trapping (06:00–10:00 morning lid, 17:00–20:00 evening settling) vs. 11:00–16:00 solar convection mixing in plain language.                                                                                                                       |
+| 10  | **Visualization**         | Zero-Dependency Native SVG Forecast                 | Lazy-loaded 24-hour trajectory chart with interactive hover/keyboard scrubbing, convection window band, and `.sr-only` accessible summary table.                                                                                                                              |
+| 11  | **Mobile UX**             | Pull-to-Refresh & 10-Min Auto-Refresh               | Touch pull-to-refresh gesture handler on mobile viewports plus background 10-minute polling aligned with server LRU cache TTL.                                                                                                                                                |
+| 12  | **Offline PWA**           | Workbox Service Worker & Offline Banner             | Precaches app shell, caches `/api/air-quality` with `NetworkFirst`, displays live online/offline banner, and supports standalone home-screen installation.                                                                                                                    |
+| 13  | **Server-Side AI**        | Conversational Pulmonary Assistant                  | Context-aware multi-turn chat injecting live zone pollutants, persona profile, and WHO/EPA citations with strict prompt-injection sanitization.                                                                                                                               |
+| 14  | **Server-Side AI**        | Emergency Severity Advisory Generator               | Produces structured `moderate`, `severe`, or `critical` public health bulletins in multiple languages for acute smog or wildfire smoke episodes.                                                                                                                              |
+| 15  | **Multimodal AI**         | Vision Analysis (`smog` / `aqi-display` / `mask`)   | Analyzes base64 photographs (up to 6 MB route limit) to estimate haze severity, read physical AQI monitor screens, or check N95/KN95 seal fit.                                                                                                                                |
+| 16  | **Clinical Analytics**    | AI Symptom–AQI Correlation Engine                   | Correlates logged household symptom timestamps and severities against ambient AQI history and classifies correlation strength (`weak`, `moderate`, `strong`).                                                                                                                 |
+| 17  | **Zero-Downtime AI**      | Deterministic Heuristic Fallback                    | Automatically engages scientifically calibrated atmospheric heuristics whenever Gemini is unconfigured, throttled, or returns invalid JSON.                                                                                                                                   |
+| 18  | **Family Health**         | Multi-Member Household Profiles                     | Color-coded avatars, age/relationship tags, clinical conditions (asthma, COPD, heart disease, allergies), activity schedules, and high-sensitivity badges (`FamilyManager.tsx`).                                                                                              |
+| 19  | **Family Health**         | 5-Symptom Timestamped Logger                        | Captures coughing, wheezing, eye irritation, shortness of breath, and headache (`none`/`mild`/`moderate`/`severe`) automatically linked to live AQI.                                                                                                                          |
+| 20  | **Family Health**         | Clinician PDF Export & GDPR Erasure                 | Generates printable doctor-visit health summaries, enforces explicit AI consent checkbox, encrypts local data (AES-256-GCM), and provides one-click GDPR full wipe.                                                                                                           |
+| 21  | **Community**             | Crowdsourced AQI & Smog Photo Feed                  | Allows residents to submit hyperlocal AQI readings and local visibility photos to fill gaps between sparse government monitoring stations.                                                                                                                                    |
+| 22  | **Environmental Justice** | Neighborhood Disparity Heatmap                      | Compares average AQI across urban districts and surfaces actionable inequity alerts (e.g., _"Zone A averages 45 AQI vs. Zone B at 180 AQI"_).                                                                                                                                 |
+| 23  | **Community Safety**      | Geotargeted Emergency Broadcasts                    | Publishes zone-scoped severe pollution alerts with shelter-in-place and vulnerable-neighbor check-in protocols.                                                                                                                                                               |
+| 24  | **Behavioral Design**     | Gamification, Streaks & Eco-Pledges                 | Tracks daily check-in streaks, 6 unlockable achievement badges, opt-in anonymous neighborhood leaderboards (table-accessible), and collective $\text{CO}_2$ pledges.                                                                                                          |
+| 25  | **Voice Accessibility**   | Hands-Free Voice Interface                          | Supports Web Speech API voice queries and spoken AQI readouts for visually impaired users and hands-free morning checks.                                                                                                                                                      |
+| 26  | **Zero-Friction Privacy** | Browser-Local Encrypted Persistence                 | Zero sign-in friction: saved zones, cached location, lifestyle profile, and AES-256-GCM encrypted family health records stay strictly on-device in the browser.                                                                                                               |
 
 ---
 
@@ -127,38 +133,37 @@ Manage vulnerable household members, log coughing/wheezing/eye irritation/shortn
 ```text
 +---------------------------------------------------------------------------------------------------+
 |                               CLIENT LAYER (React 19 + Vite 8 PWA)                                |
-|  Initial Entry Bundle: 153.3 KB JS + 16.8 KB CSS gzipped  |  Workbox Service Worker (Offline)     |
+|  Initial Entry Bundle: ~171 KB gzipped (React.lazy routes)  |  Workbox Service Worker (Offline)   |
 |                                                                                                   |
-|  +-----------------------+  +-----------------------+  +-------------------+  +----------------+  |
-|  | AQIDashboard (Eager)  |  | Lazy Route Chunks     |  | AuthContext       |  | Accessibility  |  |
-|  | - AQI Hero (aria-live)|  | - AirQualityMap       |  | - Lazy Firebase   |  | - WCAG 2.2 AA  |  |
-|  | - 5 PollutantCards    |  | - FamilyManager       |  |   Auth & Sync     |  | - Keyboard Nav |  |
-|  | - Lazy ForecastChart  |  | - CommunityHub        |  | - AES-256-GCM     |  | - Icon + Text  |  |
-|  | - InversionIndicator  |  | - HealthAssistant     |  |   Health Privacy  |  |   Status Badges|  |
-|  | - HealthRecommendation|  | - SavedZonesPanel     |  | - GDPR Erasure    |  | - ReducedMotion|  |
-|  +-----------+-----------+  +-----------+-----------+  +---------+---------+  +----------------+  |
-+--------------|--------------------------|------------------------|--------------------------------+
-               | HTTPS / JSON             | HTTPS / JSON           | Firebase SDK (Client-Side Auth)
-               v                          v                        v
-+------------------------------------------------------------------+  +-----------------------------+
-|            EXPRESS 5 API SERVER (TypeScript / Node 20)           |  |     FIREBASE PLATFORM       |
-|  Layered Security Stack (server/middleware/security.ts):         |  | - Google Sign-In OAuth      |
-|   [1] Helmet Strict CSP  [2] Dynamic CORS  [3] Morgan Safe Logs  |  | - Cloud Firestore Database  |
-|   [4] Two-Tier Rate Limiter (30/m AI | 100/m Data, skip /health) |  | - Owner-Scoped Rules        |
-|   [5] Timing-Safe X-API-Key  [6] Deep Sanitizer + Zod Schemas    |  |   (firestore.rules)         |
-|   [7] CWE-209 Safe Error Handler (zero stack trace exposure)     |  +-----------------------------+
-|                                                                  |
-|  +-------------------------------+  +-------------------------+  |
-|  | /api/aqi/* & /api/air-quality |  | /api/ai/*               |  |
-|  |  - AQIService (Fusion + LRU)  |  |  - GeminiService        |  |
-|  |  - EPA aqiEngine (Breakpoints)|  |  - Prompt Sanitizer     |  |
-|  |  - Geolocation & Reverse Geo  |  |  - Zod Output Validator |  |
-|  |  - HTTP 410 Circuit-Breaker   |  |  - SHA-256 Cache        |  |
-|  |  - >50% Outlier Dampening     |  |  - HeuristicFallback    |  |
-|  +---------------+---------------+  +------------+------------+  |
-+------------------|-------------------------------|---------------+
-                   |                               | Server-Side Secret Only (NEVER in client)
-                   v                               v
+|  +-------------------------+  +-------------------------+  +-------------------+  +------------+  |
+|  | AQIDashboard (Eager)    |  | Lazy Action & Views     |  | Browser Storage   |  | A11y Layer |  |
+|  | - AQI Hero (aria-live)  |  | - WinterSmogActionHub   |  | - Cached Location |  | - WCAG 2.2 |  |
+|  | - 5 PollutantCards      |  |   (Alternatives/IAQ/    |  | - Saved Zones &   |  |   AA Ready |  |
+|  | - Lazy ForecastChart    |  |    Daily Routine)       |  |   Lifestyle Prof. |  | - Icon+Txt |  |
+|  | - InversionIndicator    |  | - AirQualityMap         |  | - AES-256-GCM     |  |   Badges   |  |
+|  | - HealthRecommendation  |  | - FamilyManager         |  |   Health Records  |  | - Keyboard |  |
+|  |                         |  | - CommunityHub / AI     |  | - GDPR Erasure    |  |   Nav      |  |
+|  +------------+------------+  +------------+------------+  +-------------------+  +------------+  |
++---------------|----------------------------|------------------------------------------------------+
+                | HTTPS / JSON               | HTTPS / JSON
+                v                            v
++---------------------------------------------------------------------------------------------------+
+|                             EXPRESS 5 API SERVER (TypeScript / Node 20)                           |
+|  Layered Security Stack (server/middleware/security.ts):                                          |
+|   [1] Helmet Strict CSP  [2] Dynamic CORS  [3] Morgan Safe Logs  [4] 2-Tier Rate Limiter          |
+|   [5] Timing-Safe X-API-Key  [6] Deep Sanitizer + Zod Schemas  [7] CWE-209 Safe Error Handler     |
+|                                                                                                   |
+|  +------------------------------------------+  +-----------------------------------------------+  |
+|  | /api/aqi/* & /api/air-quality            |  | /api/ai/*                                     |  |
+|  |  - AQIService (Fusion + aqi/cache.ts)    |  |  - GeminiService + gemini/security.ts         |  |
+|  |  - EPA aqiEngine (Breakpoints + WHO)     |  |  - Prompt Sanitizer & PII Redaction           |  |
+|  |  - Geolocation & Reverse Geocoding       |  |  - Zod Output Validation (aiSchemas.ts)       |  |
+|  |  - HTTP 410 Circuit-Breaker              |  |  - SHA-256 Cache + 30 req/min Rate Limiter    |  |
+|  |  - >50% Outlier Dampening                |  |  - Deterministic HeuristicFallback            |  |
+|  +---------------------+--------------------+  +-----------------------+-----------------------+  |
++------------------------|-----------------------------------------------|--------------------------+
+                         |                                               | Server-Side Secret Only
+                         v                                               v
 +--------------------------------------+  +------------------------+
 | UPSTREAM TELEMETRY & GEO PROVIDERS   |  | GOOGLE GEMINI AI       |
 | - WAQI API (Primary, rel. 0.95)      |  | - @google/genai SDK    |

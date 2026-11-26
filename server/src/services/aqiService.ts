@@ -10,7 +10,6 @@
  * 3. TERTIARY: OpenWeather Air Pollution — http://api.openweathermap.org/data/2.5/air_pollution?lat={lat}&lon={lng}&appid={key}
  */
 
-import { createHash } from 'node:crypto';
 import {
   calculateAQI,
   getAQIColor,
@@ -18,181 +17,32 @@ import {
   type PollutantReadings,
 } from '../../lib/aqiEngine';
 import { logger } from '../utils/logger';
+import { createAQICacheKey, LRUCache } from './aqi/cache';
+import {
+  AQIServiceError,
+  type AQILogger,
+  type AQIServiceOptions,
+  type AQISourceName,
+  type AirQualityData,
+  type CacheStats,
+  type ForecastData,
+  type RateLimitConfig,
+  type SourceProvenance,
+  type SourceStatus,
+} from './aqi/types';
 
-/** Identifier for supported upstream air quality providers. */
-export type AQISourceName = 'WAQI' | 'OpenAQ' | 'OpenWeather';
-
-/** Provenance record tracking each upstream source's contribution to a fused reading. */
-export interface SourceProvenance {
-  /** Upstream provider name. */
-  source: AQISourceName;
-  /** Raw AQI reported or computed for this source. */
-  aqi: number;
-  /** PM2.5 concentration (µg/m³) reported by this source. */
-  pm25: number;
-  /** PM10 concentration (µg/m³) reported by this source. */
-  pm10: number;
-  /** Epoch timestamp (ms) of the source measurement. */
-  timestamp: number;
-  /** Base reliability score (0–1) assigned to this provider. */
-  reliability: number;
-  /** Final normalized weight applied during fusion (0–1). */
-  appliedWeight: number;
-  /** True when the reading deviated by >50% from the consensus baseline and was down-weighted. */
-  isOutlier: boolean;
-  /** Percentage deviation relative to the consensus baseline. */
-  deviationPercent: number;
-}
-
-/** Normalized live air quality reading returned by {@link AQIService}. */
-export interface AirQualityData {
-  /** Composite US EPA Air Quality Index (0–500). */
-  aqi: number;
-  /** Fine particulate matter PM2.5 (µg/m³). */
-  pm25: number;
-  /** Coarse particulate matter PM10 (µg/m³). */
-  pm10: number;
-  /** Nitrogen dioxide NO2 (ppb). */
-  no2: number;
-  /** Carbon monoxide CO (mg/m³). */
-  co: number;
-  /** Ground-level ozone O3 (ppm). */
-  o3: number;
-  /** Sulfur dioxide SO2 (ppb). */
-  so2: number;
-  /** Provider name or fused provider list (e.g. `'WAQI'` or `'WAQI+OpenAQ'`). */
-  source: string;
-  /** Reading timestamp in epoch milliseconds. */
-  timestamp: number;
-  /** Geographic coordinates and human-readable station/area label. */
-  location: { lat: number; lng: number; name: string };
-  /** Confidence score (0–1) derived from source reliability and multi-source agreement. */
-  confidence: number;
-  /** Optional per-source provenance audit trail. */
-  provenance?: SourceProvenance[];
-}
-
-/** Normalized air quality forecast entry. */
-export interface ForecastData {
-  /** Forecast point timestamp in epoch milliseconds. */
-  timestamp: number;
-  /** ISO-8601 date or datetime string for this forecast interval. */
-  date: string;
-  /** Predicted composite AQI (0–500). */
-  aqi: number;
-  /** US EPA category label corresponding to the predicted AQI. */
-  category: AQICategoryLabel;
-  /** Hex UI color (#RRGGBB) corresponding to the predicted AQI. */
-  color: string;
-  /** Predicted PM2.5 (µg/m³). */
-  pm25: number;
-  /** Predicted PM10 (µg/m³). */
-  pm10: number;
-  /** Predicted NO2 (ppb). */
-  no2: number;
-  /** Predicted CO (mg/m³). */
-  co: number;
-  /** Predicted O3 (ppm). */
-  o3: number;
-  /** Predicted SO2 (ppb). */
-  so2: number;
-  /** Upstream source that generated this forecast point. */
-  source: string;
-  /** Forecast confidence score (0–1). */
-  confidence: number;
-}
-
-/** Per-provider sliding-window rate limit configuration. */
-export interface RateLimitConfig {
-  /** Maximum number of upstream HTTP requests allowed per window. */
-  maxRequests: number;
-  /** Window duration in milliseconds. */
-  windowMs: number;
-}
-
-/** Structured logger interface for observability and clean testing. */
-export interface AQILogger {
-  info(message: string, meta?: Record<string, unknown>): void;
-  warn(message: string, meta?: Record<string, unknown>): void;
-  error(message: string, meta?: Record<string, unknown>): void;
-}
-
-/** Cache diagnostics snapshot. */
-export interface CacheStats {
-  size: number;
-  maxEntries: number;
-  ttlMs: number;
-  hits: number;
-  misses: number;
-  evictions: number;
-}
-
-/** Public source status summary (never exposes API keys). */
-export interface SourceStatus {
-  name: AQISourceName;
-  priority: number;
-  configured: boolean;
-  reliability: number;
-  rateLimit: {
-    maxRequests: number;
-    windowMs: number;
-    remaining: number;
-    blockedUntil: number | null;
-  };
-}
-
-/** Configuration options for {@link AQIService}. */
-export interface AQIServiceOptions {
-  /** Server-side WAQI API token. Defaults to `process.env.WAQI_API_TOKEN`. */
-  waqiToken?: string;
-  /** Optional server-side OpenAQ API key. Defaults to `process.env.OPENAQ_API_KEY`. */
-  openAqApiKey?: string;
-  /** Server-side OpenWeather API key. Defaults to `process.env.OPENWEATHER_API_KEY`. */
-  openWeatherApiKey?: string;
-  /** Fetch implementation (injectable for mocked unit tests). */
-  fetchFn?: typeof fetch;
-  /** Clock provider returning epoch ms (injectable for deterministic cache/rate-limit tests). */
-  now?: () => number;
-  /** Async sleep function (injectable for zero-delay retry unit tests). */
-  sleep?: (ms: number) => Promise<void>;
-  /** Logger implementation (defaults to console). */
-  logger?: AQILogger;
-  /** In-memory cache TTL in ms (default: 10 minutes = 600,000 ms). */
-  cacheTtlMs?: number;
-  /** Maximum LRU cache entries (default: 100). */
-  cacheMaxEntries?: number;
-  /** Maximum retry attempts after an initial transient failure (default: 2). */
-  maxRetries?: number;
-  /** Base exponential backoff delay in ms (default: 250). */
-  baseRetryDelayMs?: number;
-  /** Per-request HTTP timeout in ms (default: 6000). */
-  requestTimeoutMs?: number;
-  /** Outlier deviation threshold ratio (default: 0.50 = 50%). */
-  outlierThreshold?: number;
-  /** Multiplier applied to an outlier source's weight (default: 0.2). */
-  outlierWeightFactor?: number;
-  /**
-   * Acquisition strategy:
-   * - `'fuse'` (default): queries all configured sources in parallel, falls back automatically if any fail, and fuses valid readings with outlier detection.
-   * - `'fallback'`: queries primary first and only calls secondary/tertiary if earlier sources fail.
-   */
-  strategy?: 'fuse' | 'fallback';
-  /** Custom rate limit overrides per source. */
-  rateLimits?: Partial<Record<AQISourceName, RateLimitConfig>>;
-}
-
-/** Custom error thrown when upstream AQI retrieval fails or inputs are invalid. */
-export class AQIServiceError extends Error {
-  public readonly statusCode: number;
-  public readonly details?: Record<string, unknown>;
-
-  constructor(message: string, statusCode = 503, details?: Record<string, unknown>) {
-    super(message);
-    this.name = 'AQIServiceError';
-    this.statusCode = statusCode;
-    this.details = details;
-  }
-}
+export { AQIServiceError, createAQICacheKey, LRUCache };
+export type {
+  AQILogger,
+  AQIServiceOptions,
+  AQISourceName,
+  AirQualityData,
+  CacheStats,
+  ForecastData,
+  RateLimitConfig,
+  SourceProvenance,
+  SourceStatus,
+};
 
 const DEFAULT_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 const DEFAULT_CACHE_MAX_ENTRIES = 100;
@@ -238,117 +88,6 @@ const defaultSleep = (ms: number): Promise<void> =>
   new Promise((resolve) => {
     setTimeout(resolve, ms);
   });
-
-/**
- * Generates a deterministic SHA-256 cache key for a coordinate pair and query kind.
- * Coordinates are rounded to 3 decimal places (~111m resolution) to maximize cache hits
- * for co-located urban requests without losing neighborhood fidelity.
- */
-export function createAQICacheKey(kind: 'current' | 'forecast', lat: number, lng: number): string {
-  const normalized = `${kind}:${lat.toFixed(3)},${lng.toFixed(3)}`;
-  return createHash('sha256').update(normalized).digest('hex');
-}
-
-interface CacheEntry<T> {
-  value: T;
-  expiresAt: number;
-}
-
-/**
- * In-memory LRU cache with fixed maximum capacity and per-entry TTL expiration.
- * Uses JavaScript Map insertion order to maintain O(1) get/set/eviction semantics.
- */
-export class LRUCache<T> {
-  private readonly store = new Map<string, CacheEntry<T>>();
-  private readonly maxEntries: number;
-  private readonly ttlMs: number;
-  private readonly now: () => number;
-  private hits = 0;
-  private misses = 0;
-  private evictions = 0;
-
-  constructor(maxEntries: number, ttlMs: number, now: () => number = Date.now) {
-    if (!Number.isInteger(maxEntries) || maxEntries < 1) {
-      throw new RangeError(`maxEntries must be a positive integer; received ${maxEntries}.`);
-    }
-    if (!Number.isFinite(ttlMs) || ttlMs <= 0) {
-      throw new RangeError(`ttlMs must be a positive number; received ${ttlMs}.`);
-    }
-    this.maxEntries = maxEntries;
-    this.ttlMs = ttlMs;
-    this.now = now;
-  }
-
-  /** Retrieves a fresh entry and marks it as most recently used, or returns `undefined`. */
-  get(key: string): T | undefined {
-    const entry = this.store.get(key);
-    if (!entry) {
-      this.misses += 1;
-      return undefined;
-    }
-
-    if (this.now() >= entry.expiresAt) {
-      this.store.delete(key);
-      this.misses += 1;
-      return undefined;
-    }
-
-    // Promote to most recently used (tail of Map)
-    this.store.delete(key);
-    this.store.set(key, entry);
-    this.hits += 1;
-    return entry.value;
-  }
-
-  /** Inserts or updates an entry, evicting the least recently used entry if full. */
-  set(key: string, value: T): void {
-    if (this.store.has(key)) {
-      this.store.delete(key);
-    } else if (this.store.size >= this.maxEntries) {
-      // Purge expired entries first before evicting a live LRU entry
-      this.purgeExpired();
-      if (this.store.size >= this.maxEntries) {
-        const oldestKey = this.store.keys().next().value;
-        if (oldestKey !== undefined) {
-          this.store.delete(oldestKey);
-          this.evictions += 1;
-        }
-      }
-    }
-
-    this.store.set(key, {
-      value,
-      expiresAt: this.now() + this.ttlMs,
-    });
-  }
-
-  /** Removes all cached entries. */
-  clear(): void {
-    this.store.clear();
-  }
-
-  /** Returns cache capacity and hit/miss metrics. */
-  stats(): CacheStats {
-    this.purgeExpired();
-    return {
-      size: this.store.size,
-      maxEntries: this.maxEntries,
-      ttlMs: this.ttlMs,
-      hits: this.hits,
-      misses: this.misses,
-      evictions: this.evictions,
-    };
-  }
-
-  private purgeExpired(): void {
-    const current = this.now();
-    for (const [key, entry] of this.store.entries()) {
-      if (current >= entry.expiresAt) {
-        this.store.delete(key);
-      }
-    }
-  }
-}
 
 /**
  * Per-provider sliding-window rate limiter with HTTP 429 cooldown tracking.
