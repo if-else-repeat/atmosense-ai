@@ -1,28 +1,21 @@
 /**
  * @module aqiRoutes
  * Express REST API routes for the multi-source live Air Quality integration layer.
- *
- * Mounted under `/api/aqi`:
- * - `GET /api/aqi/current?lat=&lng=&persona=` — Fused live air quality with provenance & health advice
- * - `GET /api/aqi/forecast?lat=&lng=` — Multi-interval air quality forecast with automatic fallback
- * - `GET /api/aqi/sources` — Upstream provider configuration, rate-limit status, and cache metrics
  */
 
 import { Router, type NextFunction, type Request, type Response } from 'express';
+import { z } from 'zod';
 import {
   calculateAQI,
   getAQIColor,
   getHealthRecommendation,
   type PersonaProfile,
-} from '../../lib/aqiEngine.ts';
+} from '../lib/aqiEngine.ts';
 import { AQIService, AQIServiceError, aqiService } from '../services/aqiService.ts';
 
-const VALID_PERSONAS: ReadonlySet<PersonaProfile> = new Set([
-  'children',
-  'elderly',
-  'asthmatics',
-  'general',
-]);
+const personaSchema = z.enum(['children', 'elderly', 'asthmatics', 'general']);
+const latSchema = z.coerce.number().finite().min(-90).max(90);
+const lngSchema = z.coerce.number().finite().min(-180).max(180);
 
 interface RouteRateLimitOptions {
   maxRequests: number;
@@ -30,9 +23,6 @@ interface RouteRateLimitOptions {
   now?: () => number;
 }
 
-/**
- * Lightweight sliding-window Express rate limiter protecting upstream AQI quotas per client IP.
- */
 function createClientRateLimiter(options: RouteRateLimitOptions) {
   const { maxRequests, windowMs, now = Date.now } = options;
   const buckets = new Map<string, number[]>();
@@ -64,9 +54,6 @@ function createClientRateLimiter(options: RouteRateLimitOptions) {
   };
 }
 
-/**
- * Parses and validates `lat` and `lng` (or `lon`) query parameters.
- */
 function parseCoordinatesQuery(
   query: Request['query'],
 ): { ok: true; lat: number; lng: number } | { ok: false; error: string } {
@@ -79,35 +66,29 @@ function parseCoordinatesQuery(
         : '';
 
   if (!rawLat || !rawLng) {
-    return {
-      ok: false,
-      error: 'Query parameters "lat" and "lng" (or "lon") are required.',
-    };
+    return { ok: false, error: 'Query parameters "lat" and "lng" (or "lon") are required.' };
   }
 
-  const lat = Number(rawLat);
-  const lng = Number(rawLng);
-
-  if (!Number.isFinite(lat) || lat < -90 || lat > 90) {
+  const parsedLat = latSchema.safeParse(rawLat);
+  if (!parsedLat.success) {
     return {
       ok: false,
       error: 'Query parameter "lat" must be a finite number between -90 and 90.',
     };
   }
-  if (!Number.isFinite(lng) || lng < -180 || lng > 180) {
+
+  const parsedLng = lngSchema.safeParse(rawLng);
+  if (!parsedLng.success) {
     return {
       ok: false,
       error: 'Query parameter "lng" must be a finite number between -180 and 180.',
     };
   }
 
-  return { ok: true, lat, lng };
+  return { ok: true, lat: parsedLat.data, lng: parsedLng.data };
 }
 
-/**
- * Creates an Express router wired to the provided {@link AQIService} instance.
- * Factory pattern enables isolated testing with mocked services and custom rate limits.
- */
+/** Creates an Express router wired to the provided {@link AQIService} instance. */
 export function createAqiRouter(
   service: AQIService = aqiService,
   rateLimitOptions: RouteRateLimitOptions = { maxRequests: 60, windowMs: 60_000 },
@@ -115,10 +96,6 @@ export function createAqiRouter(
   const router = Router();
   router.use(createClientRateLimiter(rateLimitOptions));
 
-  /**
-   * GET /api/aqi/current?lat=28.6139&lng=77.2090&persona=general
-   * Returns fused live air quality readings, EPA category metadata, and persona health advice.
-   */
   router.get('/current', async (req: Request, res: Response) => {
     const coords = parseCoordinatesQuery(req.query);
     if (!coords.ok) {
@@ -127,13 +104,14 @@ export function createAqiRouter(
     }
 
     const rawPersona = typeof req.query.persona === 'string' ? req.query.persona.trim() : 'general';
-    if (!VALID_PERSONAS.has(rawPersona as PersonaProfile)) {
+    const parsedPersona = personaSchema.safeParse(rawPersona);
+    if (!parsedPersona.success) {
       res.status(400).json({
         error: 'Query parameter "persona" must be one of: children, elderly, asthmatics, general.',
       });
       return;
     }
-    const persona = rawPersona as PersonaProfile;
+    const persona: PersonaProfile = parsedPersona.data;
 
     try {
       const data = await service.getCurrentAQI(coords.lat, coords.lng);
@@ -160,10 +138,7 @@ export function createAqiRouter(
       });
     } catch (error) {
       if (error instanceof AQIServiceError) {
-        res.status(error.statusCode).json({
-          error: error.message,
-          details: error.details,
-        });
+        res.status(error.statusCode).json({ error: error.message, details: error.details });
         return;
       }
       const message = error instanceof Error ? error.message : 'Failed to fetch live AQI data.';
@@ -171,10 +146,6 @@ export function createAqiRouter(
     }
   });
 
-  /**
-   * GET /api/aqi/forecast?lat=28.6139&lng=77.2090
-   * Returns multi-interval air quality forecast with automatic WAQI → OpenWeather fallback.
-   */
   router.get('/forecast', async (req: Request, res: Response) => {
     const coords = parseCoordinatesQuery(req.query);
     if (!coords.ok) {
@@ -193,10 +164,7 @@ export function createAqiRouter(
       });
     } catch (error) {
       if (error instanceof AQIServiceError) {
-        res.status(error.statusCode).json({
-          error: error.message,
-          details: error.details,
-        });
+        res.status(error.statusCode).json({ error: error.message, details: error.details });
         return;
       }
       const message = error instanceof Error ? error.message : 'Failed to fetch AQI forecast.';
@@ -204,10 +172,6 @@ export function createAqiRouter(
     }
   });
 
-  /**
-   * GET /api/aqi/sources
-   * Returns sanitized upstream source health, reliability scores, rate limits, and LRU cache stats.
-   */
   router.get('/sources', (_req: Request, res: Response) => {
     res.json({
       sources: service.getSourceStatuses(),
@@ -219,6 +183,5 @@ export function createAqiRouter(
   return router;
 }
 
-/** Default Express router instance backed by the shared {@link aqiService}. */
 export const aqiRouter = createAqiRouter();
 export default aqiRouter;

@@ -14,8 +14,8 @@ import {
   inputValidator,
   sanitizeUrlForLog,
   timingSafeKeyEquals,
-} from '../middleware/security';
-import { communityReportSchema, sanitizeText, validateBody } from '../middleware/validate';
+} from '../src/middleware/security';
+import { communityReportSchema, sanitizeText, validateBody } from '../src/middleware/validate';
 
 async function startServer(app: Express): Promise<{ baseUrl: string; close: () => Promise<void> }> {
   const server = http.createServer(app);

@@ -10,7 +10,7 @@ import {
   getHealthRecommendation,
   type PersonaProfile,
   type PollutantReadings,
-} from '../lib/aqiEngine';
+} from '../src/lib/aqiEngine';
 
 describe('calculatePM25SubIndex (EPA piecewise linear interpolation)', () => {
   it('returns 0 at 0 µg/m³', () => {

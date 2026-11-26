@@ -31,20 +31,15 @@ export function TrendChartSvg({ hourly, city }: TrendChartSvgProps) {
   const plotW = width - pad.left - pad.right;
   const plotH = height - pad.top - pad.bottom;
 
-  const xAt = (idx: number): number => {
-    if (hourly.length <= 1) return pad.left;
-    return pad.left + (idx / (hourly.length - 1)) * plotW;
-  };
+  const xAt = (idx: number): number =>
+    hourly.length <= 1 ? pad.left : pad.left + (idx / (hourly.length - 1)) * plotW;
 
-  const yAt = (val: number): number => {
-    const ratio = Math.min(1, Math.max(0, val / yMax));
-    return pad.top + plotH - ratio * plotH;
-  };
+  const yAt = (val: number): number =>
+    pad.top + plotH - Math.min(1, Math.max(0, val / yMax)) * plotH;
 
   const linePoints = hourly
     .map((pt, idx) => `${xAt(idx).toFixed(1)},${yAt(pt[selectedMetric]).toFixed(1)}`)
     .join(' ');
-
   const firstX = xAt(0).toFixed(1);
   const lastX = xAt(Math.max(0, hourly.length - 1)).toFixed(1);
   const baselineY = (pad.top + plotH).toFixed(1);
@@ -58,7 +53,6 @@ export function TrendChartSvg({ hourly, city }: TrendChartSvgProps) {
   const activeVal = activePoint ? activePoint[selectedMetric] : 0;
   const activeX = xAt(safeIdx);
   const activeY = yAt(activeVal);
-
   const whoY = yAt(meta.whoLimit);
   const yTicks = [0, Math.round(yMax * 0.33), Math.round(yMax * 0.66), yMax];
 
@@ -104,7 +98,6 @@ export function TrendChartSvg({ hourly, city }: TrendChartSvgProps) {
         </div>
       </div>
 
-      {/* Live snapped reading readout */}
       <div className="mt-4 flex flex-wrap items-baseline justify-between gap-2 border-b border-slate-100 pb-3 dark:border-slate-800">
         <div className="flex items-baseline gap-2">
           <span
@@ -130,6 +123,8 @@ export function TrendChartSvg({ hourly, city }: TrendChartSvgProps) {
           aria-label={`24-hour ${meta.label} trend line for ${city}`}
           className="h-60 w-full min-w-[460px] select-none"
         >
+          <title>{`24-hour ${meta.label} trend line for ${city}`}</title>
+          <desc>{`Hourly ${meta.label} concentration in ${meta.unit} compared against ${meta.whoLabel}.`}</desc>
           <defs>
             <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor="#0891b2" stopOpacity="0.24" />
@@ -137,7 +132,6 @@ export function TrendChartSvg({ hourly, city }: TrendChartSvgProps) {
             </linearGradient>
           </defs>
 
-          {/* Horizontal Gridlines & Y-Axis Labels */}
           {yTicks.map((tick) => {
             const y = yAt(tick);
             return (
@@ -162,7 +156,6 @@ export function TrendChartSvg({ hourly, city }: TrendChartSvgProps) {
             );
           })}
 
-          {/* WHO / EPA Reference Ceiling */}
           <line
             x1={pad.left}
             y1={whoY}
@@ -182,7 +175,6 @@ export function TrendChartSvg({ hourly, city }: TrendChartSvgProps) {
             Guideline {meta.whoLimit}
           </text>
 
-          {/* Area & Telemetry Curve */}
           {areaPath && <path d={areaPath} fill={`url(#${gradientId})`} />}
           {linePoints && (
             <polyline
@@ -195,7 +187,6 @@ export function TrendChartSvg({ hourly, city }: TrendChartSvgProps) {
             />
           )}
 
-          {/* Active Crosshair */}
           {activePoint && (
             <g>
               <line
@@ -219,7 +210,6 @@ export function TrendChartSvg({ hourly, city }: TrendChartSvgProps) {
             </g>
           )}
 
-          {/* X-Axis Hour Labels (every 4 hours) */}
           {hourly.map((pt, idx) => {
             if (idx % 4 !== 0 && idx !== hourly.length - 1) return null;
             return (
@@ -235,7 +225,6 @@ export function TrendChartSvg({ hourly, city }: TrendChartSvgProps) {
             );
           })}
 
-          {/* Interactive Hit Targets */}
           {hourly.map((pt, idx) => {
             const bandWidth = plotW / Math.max(1, hourly.length - 1);
             return (

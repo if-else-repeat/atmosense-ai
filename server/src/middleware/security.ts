@@ -8,7 +8,7 @@
 import cors, { type CorsOptions } from 'cors';
 import type { ErrorRequestHandler, NextFunction, Request, RequestHandler, Response } from 'express';
 import helmet from 'helmet';
-import { logger } from '../src/utils/logger.ts';
+import { logger } from '../utils/logger.ts';
 import {
   apiKeyAuth,
   createApiKeyAuth,

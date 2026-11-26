@@ -10,6 +10,7 @@ import {
   writeCachedStations,
   type CachedCurrentLocation,
 } from '../utils/locationStorage';
+import { fetchAllStations, fetchIpDetectedStation, fetchStationByCoords } from './stationFetchers';
 
 export interface StationNetworkState {
   stations: AirQualityStation[];
@@ -28,10 +29,7 @@ export interface StationNetworkState {
   }) => Promise<void>;
 }
 
-/**
- * Manages the global urban monitoring station list, browser-persisted user
- * location (GPS or IP fallback), offline resilience, and live telemetry refresh.
- */
+/** Manages the global urban monitoring station list, browser-persisted user location, and offline sync. */
 export function useStationNetwork(): StationNetworkState {
   const initialSavedLocRef = useRef<CachedCurrentLocation | null | undefined>(undefined);
   if (initialSavedLocRef.current === undefined) {
@@ -39,17 +37,19 @@ export function useStationNetwork(): StationNetworkState {
   }
   const initialSavedLoc = initialSavedLocRef.current;
 
-  const [stations, setStations] = useState<AirQualityStation[]>(() => {
-    const cachedList = readCachedStations() ?? OFFLINE_FALLBACK_STATIONS;
-    return mergeStationsWithCurrent(cachedList, initialSavedLoc?.station ?? null);
-  });
+  const [stations, setStations] = useState<AirQualityStation[]>(() =>
+    mergeStationsWithCurrent(
+      readCachedStations() ?? OFFLINE_FALLBACK_STATIONS,
+      initialSavedLoc?.station ?? null,
+    ),
+  );
   const [selectedStationId, setSelectedStationId] = useState<string>(() =>
     initialSavedLoc ? 'current-location' : OFFLINE_FALLBACK_STATIONS[0]!.id,
   );
-  const [loadingStations, setLoadingStations] = useState<boolean>(false);
-  const [refreshing, setRefreshing] = useState<boolean>(false);
-  const [locating, setLocating] = useState<boolean>(false);
-  const [isOnline, setIsOnline] = useState<boolean>(() =>
+  const [loadingStations, setLoadingStations] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [locating, setLocating] = useState(false);
+  const [isOnline, setIsOnline] = useState(() =>
     typeof navigator === 'undefined' ? true : navigator.onLine,
   );
   const [locationStatus, setLocationStatus] = useState<string | null>(() =>
@@ -75,7 +75,6 @@ export function useStationNetwork(): StationNetworkState {
       };
       currentLocationRef.current = cachedEntry;
       writeCachedCurrentLocation(cachedEntry);
-
       setStations((prev) => {
         const merged = mergeStationsWithCurrent(prev, normalized);
         writeCachedStations(merged);
@@ -91,19 +90,16 @@ export function useStationNetwork(): StationNetworkState {
     async (forceRefresh = false): Promise<boolean> => {
       const saved = currentLocationRef.current;
       if (!saved || (typeof navigator !== 'undefined' && !navigator.onLine)) return false;
-
       try {
-        const refreshQuery = forceRefresh ? '&refresh=1' : '';
-        const res = await fetch(
-          `/api/air-quality/by-coords?lat=${encodeURIComponent(saved.station.latitude)}&lng=${encodeURIComponent(saved.station.longitude)}&stationId=current-location${refreshQuery}`,
+        const station = await fetchStationByCoords(
+          saved.station.latitude,
+          saved.station.longitude,
+          forceRefresh,
         );
-        if (!res.ok) return false;
-
-        const payload = (await res.json()) as { station?: AirQualityStation };
-        if (payload.station) {
-          upsertCurrentLocationStation(payload.station, saved.method, {
+        if (station) {
+          upsertCurrentLocationStation(station, saved.method, {
             select: false,
-            statusText: `Saved location · ${payload.station.city}, ${payload.station.country}`,
+            statusText: `Saved location · ${station.city}, ${station.country}`,
           });
           return true;
         }
@@ -119,53 +115,37 @@ export function useStationNetwork(): StationNetworkState {
     async (options: { userInitiated?: boolean; forceRefresh?: boolean } = {}) => {
       const { userInitiated = false, forceRefresh = false } = options;
       if (typeof navigator !== 'undefined' && !navigator.onLine) {
-        if (userInitiated) {
+        if (userInitiated)
           setLocationStatus('Offline · Connect to the internet to update your location');
-        }
         return;
       }
 
       setLocating(true);
       setLocationStatus('Detecting your location...');
-      const refreshQuery = forceRefresh ? '&refresh=1' : '';
-
       try {
         const coords = await getBrowserCoordinates(userInitiated ? 9000 : 5500);
-        const res = await fetch(
-          `/api/air-quality/by-coords?lat=${encodeURIComponent(coords.latitude)}&lng=${encodeURIComponent(coords.longitude)}&stationId=current-location${refreshQuery}`,
-        );
-        if (res.ok) {
-          const payload = (await res.json()) as { station?: AirQualityStation };
-          if (payload.station) {
-            upsertCurrentLocationStation(payload.station, 'gps', {
-              select: true,
-              statusText: `Saved GPS · ${payload.station.city}, ${payload.station.country}`,
-            });
-            setLocating(false);
-            return;
-          }
+        const station = await fetchStationByCoords(coords.latitude, coords.longitude, forceRefresh);
+        if (station) {
+          upsertCurrentLocationStation(station, 'gps', {
+            select: true,
+            statusText: `Saved GPS · ${station.city}, ${station.country}`,
+          });
+          setLocating(false);
+          return;
         }
       } catch {
         // GPS unavailable or denied — fall back to server-side IP lookup
       }
 
       try {
-        const res = await fetch(
-          `/api/air-quality/detect-location${forceRefresh ? '?refresh=1' : ''}`,
-        );
-        if (res.ok) {
-          const payload = (await res.json()) as {
-            detected?: boolean;
-            station?: AirQualityStation | null;
-          };
-          if (payload.detected && payload.station) {
-            upsertCurrentLocationStation(payload.station, 'ip', {
-              select: true,
-              statusText: `Saved location · ${payload.station.city}, ${payload.station.country}`,
-            });
-            setLocating(false);
-            return;
-          }
+        const ipStation = await fetchIpDetectedStation(forceRefresh);
+        if (ipStation) {
+          upsertCurrentLocationStation(ipStation, 'ip', {
+            select: true,
+            statusText: `Saved location · ${ipStation.city}, ${ipStation.country}`,
+          });
+          setLocating(false);
+          return;
         }
       } catch {
         // Network error during IP detection
@@ -189,23 +169,16 @@ export function useStationNetwork(): StationNetworkState {
         setFetchError(null);
         return;
       }
-
       if (forceRefresh) setRefreshing(true);
       else setLoadingStations(true);
       setFetchError(null);
 
       try {
-        const response = await fetch(`/api/air-quality${forceRefresh ? '?refresh=1' : ''}`);
-        if (!response.ok) throw new Error(`Telemetry API returned ${response.status}`);
-
-        const data = (await response.json()) as { stations?: AirQualityStation[] };
-        if (Array.isArray(data.stations) && data.stations.length > 0) {
-          if (currentLocationRef.current) {
-            await refreshSavedCurrentLocation(forceRefresh);
-          }
-
+        const fetched = await fetchAllStations(forceRefresh);
+        if (fetched.length > 0) {
+          if (currentLocationRef.current) await refreshSavedCurrentLocation(forceRefresh);
           const merged = mergeStationsWithCurrent(
-            data.stations,
+            fetched,
             currentLocationRef.current?.station ?? null,
           );
           writeCachedStations(merged);
@@ -231,9 +204,7 @@ export function useStationNetwork(): StationNetworkState {
   useEffect(() => {
     if (typeof navigator !== 'undefined' && !navigator.onLine) return;
     void loadStations(false);
-    if (!currentLocationRef.current) {
-      void detectCurrentLocation({ userInitiated: false });
-    }
+    if (!currentLocationRef.current) void detectCurrentLocation({ userInitiated: false });
   }, [loadStations, detectCurrentLocation]);
 
   useEffect(() => {
@@ -241,12 +212,9 @@ export function useStationNetwork(): StationNetworkState {
       setIsOnline(true);
       setFetchError(null);
       void loadStations(true);
-      if (!currentLocationRef.current) {
-        void detectCurrentLocation({ userInitiated: false });
-      }
+      if (!currentLocationRef.current) void detectCurrentLocation({ userInitiated: false });
     };
     const handleOffline = () => setIsOnline(false);
-
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
     return () => {

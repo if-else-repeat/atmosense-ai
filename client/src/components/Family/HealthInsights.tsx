@@ -1,55 +1,19 @@
 import { AlertCircle, CheckCircle2, FileDown, Lock, Sparkles, TrendingUp } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import {
-  SEVERITY_SCORE,
-  SYMPTOM_FIELD_LABELS,
-  type CorrelationStrength,
-  type FamilyHealthInsight,
-  type FamilyMember,
-  type SymptomFieldKey,
-  type SymptomLogEntry,
-} from '../../types/family';
+import type { FamilyHealthInsight, FamilyMember, SymptomLogEntry } from '../../types/family';
 import { analyzeSymptomCorrelations, downloadDoctorVisitPdf } from '../../utils/healthCrypto';
+import { InsightCard } from './InsightCard';
+import {
+  buildDeidentifiedPayload,
+  mapAiInsightsResponse,
+  type RawAiInsightItem,
+} from './insightFormatters';
 
 interface HealthInsightsProps {
   member: FamilyMember;
   logs: SymptomLogEntry[];
   aiConsent: boolean;
   onToggleAiConsent: (consented: boolean) => void;
-}
-
-const SYMPTOM_KEYS: SymptomFieldKey[] = [
-  'coughing',
-  'wheezing',
-  'eyeIrritation',
-  'shortnessOfBreath',
-  'headache',
-];
-
-function correlationBadgeMeta(strength: CorrelationStrength): {
-  label: string;
-  classes: string;
-} {
-  switch (strength) {
-    case 'strong':
-      return {
-        label: 'Strong correlation',
-        classes:
-          'border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/60 dark:bg-rose-950/50 dark:text-rose-200',
-      };
-    case 'moderate':
-      return {
-        label: 'Moderate correlation',
-        classes:
-          'border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/50 dark:text-amber-200',
-      };
-    default:
-      return {
-        label: 'Weak correlation',
-        classes:
-          'border-slate-200 bg-slate-100 text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200',
-      };
-  }
 }
 
 export function HealthInsights({
@@ -81,69 +45,19 @@ export function HealthInsights({
     setAiError(null);
 
     try {
-      // Send strictly de-identified symptom/AQI payload — never member names or PII
-      const symptomPayload = memberLogs.map((entry) => {
-        const activeSymptoms = SYMPTOM_KEYS.filter((k) => entry[k] !== 'none').map(
-          (k) => SYMPTOM_FIELD_LABELS[k],
-        );
-        const maxScore = Math.max(1, ...SYMPTOM_KEYS.map((k) => SEVERITY_SCORE[entry[k]]));
-        const mappedSeverity = Math.min(5, Math.max(1, maxScore + 1)) as 1 | 2 | 3 | 4 | 5;
-        return {
-          timestamp: entry.timestamp,
-          symptoms: activeSymptoms.length > 0 ? activeSymptoms : ['No active symptoms'],
-          severity: mappedSeverity,
-        };
-      });
-
-      const aqiHistory = memberLogs.map((entry) => ({
-        timestamp: entry.timestamp,
-        aqi: entry.aqiAtLog,
-      }));
-
       const response = await fetch('/api/ai/health-insights', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          symptomLogs: symptomPayload,
-          aqiHistory,
-        }),
+        body: JSON.stringify(buildDeidentifiedPayload(memberLogs)),
       });
 
       if (!response.ok) {
         throw new Error(`AI analysis returned status ${response.status}`);
       }
 
-      const payload = (await response.json()) as {
-        insights?: Array<{
-          pattern?: string;
-          recommendation?: string;
-          confidence?: number;
-          triggerPollutant?: string;
-        }>;
-      };
-
+      const payload = (await response.json()) as { insights?: RawAiInsightItem[] };
       if (Array.isArray(payload.insights) && payload.insights.length > 0) {
-        const mapped: FamilyHealthInsight[] = payload.insights.map((item, idx) => {
-          const conf = typeof item.confidence === 'number' ? item.confidence : 0.6;
-          const strength: CorrelationStrength =
-            conf >= 0.75 ? 'strong' : conf >= 0.45 ? 'moderate' : 'weak';
-          const avgAqi =
-            memberLogs.reduce((acc, log) => acc + log.aqiAtLog, 0) / Math.max(1, memberLogs.length);
-          return {
-            id: `ai-${member.id}-${idx}`,
-            pattern:
-              item.pattern ||
-              `Elevated AQI periods align with respiratory symptoms for your ${member.relationship.toLowerCase()}.`,
-            recommendation:
-              item.recommendation ||
-              'Limit high-exertion outdoor exposure when AQI exceeds 100 and monitor symptoms.',
-            correlationStrength: strength,
-            affectedSymptom: item.triggerPollutant || 'Ambient Particulate Exposure',
-            averageAqiWhenReported: Math.round(avgAqi),
-            source: 'ai',
-          };
-        });
-        setAiInsights(mapped);
+        setAiInsights(mapAiInsightsResponse(payload.insights, member, memberLogs));
       } else {
         setAiInsights(localInsights);
       }
@@ -188,14 +102,13 @@ export function HealthInsights({
         <button
           type="button"
           onClick={handleExportPdf}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-800 whitespace-nowrap shrink-0"
+          className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-800"
         >
           <FileDown className="h-3.5 w-3.5" aria-hidden="true" />
           Export Doctor Visit PDF
         </button>
       </div>
 
-      {/* Explicit Consent Gate for AI Analysis */}
       <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3.5 dark:border-slate-800 dark:bg-slate-950/70">
         <div className="flex flex-col gap-3">
           <label className="flex cursor-pointer items-start gap-2.5 text-xs text-slate-700 dark:text-slate-300">
@@ -218,7 +131,7 @@ export function HealthInsights({
             type="button"
             disabled={!aiConsent || memberLogs.length === 0 || loadingAi}
             onClick={() => void handleRunAiAnalysis()}
-            className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-slate-900 px-3.5 py-2 text-xs font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:self-start dark:bg-cyan-700 dark:hover:bg-cyan-600 whitespace-nowrap shrink-0"
+            className="inline-flex w-full shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg bg-slate-900 px-3.5 py-2 text-xs font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:self-start dark:bg-cyan-700 dark:hover:bg-cyan-600"
           >
             <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
             {loadingAi ? 'Analyzing…' : 'Run AI Correlation'}
@@ -261,37 +174,7 @@ export function HealthInsights({
             and personalized protective recommendations.
           </p>
         ) : (
-          displayedInsights.map((insight) => {
-            const meta = correlationBadgeMeta(insight.correlationStrength);
-            return (
-              <article
-                key={insight.id}
-                className="rounded-lg border border-slate-200 bg-slate-50/50 p-4 dark:border-slate-800 dark:bg-slate-950/50"
-              >
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                    {insight.affectedSymptom} · Avg AQI{' '}
-                    <span className="font-mono tabular-nums">{insight.averageAqiWhenReported}</span>
-                  </span>
-                  <span
-                    className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium ${meta.classes}`}
-                  >
-                    <TrendingUp className="h-3 w-3" aria-hidden="true" />
-                    {meta.label}
-                  </span>
-                </div>
-                <p className="mt-2 text-sm font-medium text-slate-900 dark:text-slate-100">
-                  {insight.pattern}
-                </p>
-                <p className="mt-1.5 text-xs leading-relaxed text-slate-600 dark:text-slate-400">
-                  <strong className="font-semibold text-slate-800 dark:text-slate-200">
-                    Recommendation:
-                  </strong>{' '}
-                  {insight.recommendation}
-                </p>
-              </article>
-            );
-          })
+          displayedInsights.map((insight) => <InsightCard key={insight.id} insight={insight} />)
         )}
       </div>
     </section>

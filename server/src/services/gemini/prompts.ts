@@ -3,7 +3,7 @@
  * Deterministic, injection-hardened prompt builders for all AtmoSense AI Gemini tasks.
  */
 
-import type { PersonaProfile } from '../../../lib/aqiEngine.ts';
+import type { PersonaProfile } from '../../lib/aqiEngine.ts';
 import type {
   AQIDataPoint,
   ChatMessage,

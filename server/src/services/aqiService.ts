@@ -78,10 +78,7 @@ function cloneAirQualityData(data: AirQualityData): AirQualityData {
   };
 }
 
-/**
- * Multi-source live Air Quality Index service with automatic provider fallback,
- * consensus fusion with >50% outlier dampening, SHA-256 LRU caching, retries, and rate limiting.
- */
+/** Multi-source live Air Quality Index service with consensus fusion, caching, and rate limiting. */
 export class AQIService {
   private readonly creds: ProviderCredentials;
   private readonly logger: AQILogger;
@@ -137,7 +134,6 @@ export class AQIService {
   /** Fetches live fused air quality data for coordinates with 10-minute SHA-256 LRU caching. */
   async getCurrentAQI(lat: number, lng: number): Promise<AirQualityData> {
     assertValidCoordinates(lat, lng);
-
     const cacheKey = createAQICacheKey('current', lat, lng);
     const cached = this.currentCache.get(cacheKey);
     if (cached) return cloneAirQualityData(cached);
@@ -164,7 +160,6 @@ export class AQIService {
   /** Fetches multi-day/hourly air quality forecast with WAQI primary and OpenWeather fallback. */
   async getForecast(lat: number, lng: number): Promise<ForecastData[]> {
     assertValidCoordinates(lat, lng);
-
     const cacheKey = createAQICacheKey('forecast', lat, lng);
     const cached = this.forecastCache.get(cacheKey);
     if (cached) return cached.map((entry) => ({ ...entry }));
@@ -175,15 +170,10 @@ export class AQIService {
       return waqiForecast.map((entry) => ({ ...entry }));
     }
 
-    const openWeatherForecast = await fetchForecastFromOpenWeather(
-      this.fetchCtx,
-      this.creds,
-      lat,
-      lng,
-    );
-    if (openWeatherForecast && openWeatherForecast.length > 0) {
-      this.forecastCache.set(cacheKey, openWeatherForecast);
-      return openWeatherForecast.map((entry) => ({ ...entry }));
+    const owForecast = await fetchForecastFromOpenWeather(this.fetchCtx, this.creds, lat, lng);
+    if (owForecast && owForecast.length > 0) {
+      this.forecastCache.set(cacheKey, owForecast);
+      return owForecast.map((entry) => ({ ...entry }));
     }
 
     this.logger.error('All air quality forecast sources failed', { lat, lng });
@@ -194,12 +184,10 @@ export class AQIService {
     );
   }
 
-  /** Returns cache statistics for both current and forecast LRU caches. */
   getCacheStats(): { current: CacheStats; forecast: CacheStats } {
     return { current: this.currentCache.stats(), forecast: this.forecastCache.stats() };
   }
 
-  /** Returns sanitized health and rate-limit metadata for all configured sources. */
   getSourceStatuses(): SourceStatus[] {
     return [
       {
@@ -226,7 +214,6 @@ export class AQIService {
     ];
   }
 
-  /** Clears both in-memory LRU caches. */
   clearCache(): void {
     this.currentCache.clear();
     this.forecastCache.clear();
@@ -265,5 +252,4 @@ export class AQIService {
   }
 }
 
-/** Shared singleton instance configured from server-side environment variables. */
 export const aqiService = new AQIService();

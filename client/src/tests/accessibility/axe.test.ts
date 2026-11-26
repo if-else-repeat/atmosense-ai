@@ -1,23 +1,27 @@
-import { cleanup, render } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import axe from 'axe-core';
 import { createElement } from 'react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { WinterSmogActionHub } from '../../components/ActionHub/WinterSmogActionHub';
 import { CommunityHub } from '../../components/Community/CommunityHub';
 import { EnvironmentalJustice } from '../../components/Community/EnvironmentalJustice';
 import { Leaderboard } from '../../components/Community/Leaderboard';
+import { AQIDashboard } from '../../components/Dashboard/AQIDashboard';
 import { ForecastChart } from '../../components/Dashboard/ForecastChart';
 import { FamilyManager } from '../../components/Family/FamilyManager';
+import { HealthAssistantPanel } from '../../components/HealthAssistantPanel';
 import { RoutineOptimizer } from '../../components/Routine/RoutineOptimizer';
 import { VoiceInterface } from '../../components/Voice/VoiceInterface';
+import { WorkspaceProvider } from '../../context/AuthContext';
+import { OFFLINE_FALLBACK_STATIONS } from '../../utils/airQuality';
 
 afterEach(() => {
   cleanup();
+  vi.restoreAllMocks();
   window.localStorage.clear();
 });
 
 async function runAxeAudit(container: HTMLElement) {
-  // Disable color-contrast rule in jsdom (no computed canvas/layout engine); keep all semantic/ARIA/form/table checks active
   return axe.run(container, {
     rules: {
       'color-contrast': { enabled: false },
@@ -26,6 +30,47 @@ async function runAxeAudit(container: HTMLElement) {
 }
 
 describe('Accessibility Compliance Suite (axe-core)', () => {
+  it('AQIDashboard has zero axe-core accessibility violations', async () => {
+    const now = Date.now();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string | URL | Request) => {
+        const url = String(input);
+        if (url.includes('/api/aqi/current')) {
+          return new Response(
+            JSON.stringify({
+              data: {
+                aqi: 132,
+                pm25: 48,
+                pm10: 92,
+                no2: 34,
+                co: 1.2,
+                o3: 0.045,
+                so2: 9,
+                source: 'WAQI',
+                timestamp: now - 60_000,
+                location: { lat: 28.6139, lng: 77.209, name: 'New Delhi, India' },
+                confidence: 0.92,
+              },
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          );
+        }
+        return new Response(JSON.stringify({ forecast: [] }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }),
+    );
+
+    const { container } = render(
+      createElement(AQIDashboard, { lat: 28.6139, lng: 77.209, locationName: 'New Delhi, India' }),
+    );
+    await screen.findByTestId('realtime-aqi-value');
+    const results = await runAxeAudit(container);
+    expect(results.violations).toEqual([]);
+  });
+
   it('FamilyManager has zero axe-core accessibility violations', async () => {
     const { container } = render(
       createElement(FamilyManager, { currentAqi: 138, locationName: 'New Delhi, India' }),
@@ -67,15 +112,8 @@ describe('Accessibility Compliance Suite (axe-core)', () => {
       createElement(
         'div',
         null,
-        createElement(RoutineOptimizer, {
-          zoneName: 'London, UK',
-          aqi: 64,
-          pm25: 18.2,
-        }),
-        createElement(VoiceInterface, {
-          aqi: 64,
-          locationName: 'London, UK',
-        }),
+        createElement(RoutineOptimizer, { zoneName: 'London, UK', aqi: 64, pm25: 18.2 }),
+        createElement(VoiceInterface, { aqi: 64, locationName: 'London, UK' }),
       ),
     );
     const results = await runAxeAudit(container);
@@ -90,6 +128,22 @@ describe('Accessibility Compliance Suite (axe-core)', () => {
         pm25: 115,
         persona: 'asthmatics',
       }),
+    );
+    const results = await runAxeAudit(container);
+    expect(results.violations).toEqual([]);
+  });
+
+  it('HealthAssistantPanel has zero axe-core accessibility violations', async () => {
+    const { container } = render(
+      createElement(
+        WorkspaceProvider,
+        null,
+        createElement(HealthAssistantPanel, {
+          station: OFFLINE_FALLBACK_STATIONS[0]!,
+          sensitivityProfile: 'respiratory',
+          onChangeSensitivity: () => {},
+        }),
+      ),
     );
     const results = await runAxeAudit(container);
     expect(results.violations).toEqual([]);

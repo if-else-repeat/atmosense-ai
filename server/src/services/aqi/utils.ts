@@ -3,7 +3,7 @@
  * Rate limiting, coordinate validation, unit normalization, and reading validation for AQIService.
  */
 
-import type { AQICategoryLabel } from '../../../lib/aqiEngine.ts';
+import type { AQICategoryLabel } from '../../lib/aqiEngine.ts';
 import type { AQISourceName, AirQualityData, RateLimitConfig } from './types.ts';
 
 export const SOURCE_RELIABILITY: Readonly<Record<AQISourceName, number>> = {

@@ -3,7 +3,7 @@
  * Shared types, atmospheric boundary-layer window definitions, and mask/risk helpers.
  */
 
-import type { PersonaProfile } from '../../../lib/aqiEngine.ts';
+import type { PersonaProfile } from '../../lib/aqiEngine.ts';
 
 /** Canonical atmospheric boundary-layer risk windows used by fallback heuristics. */
 export const ATMOSPHERIC_WINDOWS = {

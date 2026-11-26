@@ -3,9 +3,9 @@
 > **Breathe with foresight.** Hyperlocal multi-source air quality telemetry, atmospheric inversion physics, family respiratory protection, and evidence-based pulmonary guidance—engineered for everyday urban resilience.
 
 [![CI Pipeline](https://img.shields.io/badge/CI-Passing-16a34a?style=flat-square&logo=githubactions&logoColor=white)](./TESTING.md)
-[![Test Suite](https://img.shields.io/badge/Tests-160%20Passing-16a34a?style=flat-square&logo=vitest&logoColor=white)](./TESTING.md)
-[![Code Coverage](https://img.shields.io/badge/Coverage-89.2%25%20Stmts%20%7C%2091.7%25%20Lines-0e7490?style=flat-square)](./TESTING.md)
-[![Initial Bundle](https://img.shields.io/badge/Initial%20Bundle-155.2%20KB%20gzip-0e7490?style=flat-square)](./EFFICIENCY.md)
+[![Test Suite](https://img.shields.io/badge/Tests-197%20Passing-16a34a?style=flat-square&logo=vitest&logoColor=white)](./TESTING.md)
+[![Code Quality](https://img.shields.io/badge/Code%20Quality-SRP%20%E2%89%A4%20260%20LOC-0e7490?style=flat-square)](./CODE_QUALITY.md)
+[![Initial Bundle](https://img.shields.io/badge/Initial%20Bundle-155.5%20KB%20gzip-0e7490?style=flat-square)](./EFFICIENCY.md)
 [![Accessibility](https://img.shields.io/badge/WCAG%202.2-AA%20Compliant-2563eb?style=flat-square)](./ACCESSIBILITY.md)
 [![Security](https://img.shields.io/badge/Security-OWASP%20%2B%20STRIDE%20Hardened-0f172a?style=flat-square)](./SECURITY.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-0284c7?style=flat-square)](#license)
@@ -147,14 +147,14 @@ AtmoSense AI directly delivers every objective of **Challenge 6** through an int
                 v                            v
 +---------------------------------------------------------------------------------------------------+
 |                             EXPRESS 5 API SERVER (TypeScript / Node 20)                           |
-|  Layered Security Stack (server/middleware/security.ts):                                          |
+|  Layered Security Stack (server/src/middleware/security.ts):                                      |
 |   [1] Helmet Strict CSP  [2] Dynamic CORS  [3] Morgan Safe Logs  [4] 2-Tier Rate Limiter          |
 |   [5] Timing-Safe X-API-Key  [6] Deep Sanitizer + Zod Schemas  [7] CWE-209 Safe Error Handler     |
 |                                                                                                   |
 |  +------------------------------------------+  +-----------------------------------------------+  |
 |  | /api/aqi/* & /api/air-quality            |  | /api/ai/*                                     |  |
-|  |  - AQIService (Fusion + aqi/cache.ts)    |  |  - GeminiService + gemini/security.ts         |  |
-|  |  - EPA aqiEngine (Breakpoints + WHO)     |  |  - Prompt Sanitizer & PII Redaction           |  |
+|  |  - AQIService (Fusion + aqi/cache.ts)    |  |  - GeminiService + gemini/outputGuard.ts      |  |
+|  |  - EPA aqiEngine (Breakpoints + WHO)     |  |  - Prompt Sanitizer & Clinical Safety Guard   |  |
 |  |  - Geolocation & Reverse Geocoding       |  |  - Zod Output Validation (aiSchemas.ts)       |  |
 |  |  - HTTP 410 Circuit-Breaker              |  |  - SHA-256 Cache + 30 req/min Rate Limiter    |  |
 |  |  - >50% Outlier Dampening                |  |  - Deterministic HeuristicFallback            |  |
@@ -172,7 +172,7 @@ AtmoSense AI directly delivers every objective of **Challenge 6** through an int
 +--------------------------------------+
 ```
 
-For deep component diagrams, data lifecycle sequences, and Architecture Decision Records (ADRs 001–008), see **[ARCHITECTURE.md](./ARCHITECTURE.md)**.
+For deep component diagrams, data lifecycle sequences, Architecture Decision Records (**ADR-001–005**), and automated code-quality standards, see **[ARCHITECTURE.md](./ARCHITECTURE.md)**, **[docs/DECISIONS.md](./docs/DECISIONS.md)**, and **[CODE_QUALITY.md](./CODE_QUALITY.md)**.
 
 ---
 
@@ -190,7 +190,7 @@ For deep component diagrams, data lifecycle sequences, and Architecture Decision
 | **Validation**          | Zod                                             | v4.6                  | Runtime schema validation for all POST request bodies and all structured LLM responses.                                  |
 | **Security Middleware** | Helmet + CORS + Morgan + `node:crypto`          | Helmet 8.3            | Strict CSP, dynamic origin allowlist, PII-redacted request logs, SHA-256 timing-safe API key verification.               |
 | **Auth & Database**     | Firebase Auth + Cloud Firestore                 | Firebase 13.4         | Client-side Google OAuth, real-time synced saved zones and advisories, strict owner-only Firestore rules.                |
-| **Testing & A11y**      | Vitest + React Testing Library + MSW + axe-core | Vitest 5.1 / axe 4.14 | 142 automated unit, integration, API-mocked, and WCAG accessibility tests with V8 coverage reporting.                    |
+| **Testing & A11y**      | Vitest + React Testing Library + MSW + axe-core | Vitest 5.1 / axe 4.14 | 197 automated tests across 29 canonical suites including architecture conventions & WCAG contrast/landmark audits.       |
 | **Containers & CI**     | Docker + Docker Compose + ESLint 10             | Node 20 Alpine        | Multi-stage non-root container (`HEALTHCHECK` on `/api/health`) and strict zero-warning linting.                         |
 
 ---
@@ -292,30 +292,29 @@ AtmoSense AI provides a fully documented REST API under `/api/*`, backed by an *
 AtmoSense AI enforces automated unit, integration, security, and accessibility testing using **Vitest 5**, **React Testing Library**, **MSW 3**, and **axe-core 4**:
 
 ```bash
-# Run the complete 142-test suite
-npm run test:ci
+# Run the complete 29-suite, 197-test suite
+npm test
 
 # Run with V8 code coverage report
 npx vitest run --coverage
 
 # TypeScript strict type-checking (zero errors)
+npx tsc --noEmit
+
+# ESLint (--max-warnings=0) + TypeScript strict check
 npm run lint
 
-# ESLint code quality verification (zero warnings)
-npm run lint:eslint
-
-# Verify formatting
+# Verify Prettier formatting
 npm run format:check
 ```
 
-### Verified Test Metrics
+### Verified Test & Code Quality Metrics
 
-- **15 test suites / 142 tests passing** (0 skipped, 0 `.only`)
-- **Code Coverage (V8)**: **89.02% Statements** · **90.21% Functions** · **91.57% Lines**
-- **Core Modules**: `aqiEngine.ts` (`98.85%` stmts / `100%` funcs), `security.ts` (`96.89%` stmts / `100%` funcs), `formatters.ts` (`100%` stmts / `100%` lines)
-- **Accessibility**: Automated `axe-core` WCAG 2.2 AA audit passes across core dashboard, routine, voice, and family workflows
+- **29 canonical test suites / 197 tests passing** (0 skipped, 0 `.only`)
+- **Automated Architecture Gate (`server/tests/conventions.test.ts`)**: All 113 production source files `<= 260 lines` (`<= 9.5 KB`), zero `any` or unsafe patterns, strict client/server boundaries, and universal route Zod + rate-limiting coverage
+- **Accessibility**: Automated `axe-core` WCAG 2.2 AA audits + programmatic sRGB luminance contrast (`>= 4.5:1`) and 4-landmark structural verification
 
-See **[TESTING.md](./TESTING.md)** for full test suite structure and mocking architecture.
+See **[TESTING.md](./TESTING.md)** and **[CODE_QUALITY.md](./CODE_QUALITY.md)** for full suite inventory and conventions.
 
 ---
 
@@ -341,11 +340,13 @@ For Google Cloud Run, Firebase Firestore Rules deployment (`firestore.rules`), T
 | Document                                           | Description                                                                                      |
 | -------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
 | **[PROBLEM_ALIGNMENT.md](./PROBLEM_ALIGNMENT.md)** | Requirements Traceability Matrix (RTM) mapping 100% of problem requirements to code & tests      |
-| **[ARCHITECTURE.md](./ARCHITECTURE.md)**           | System topology, multi-source fusion math, data flows, and Architecture Decision Records (ADRs)  |
-| **[SECURITY.md](./SECURITY.md)**                   | STRIDE threat model, OWASP Top 10 mapping, CWE-209 compliance, and privacy controls              |
+| **[CODE_QUALITY.md](./CODE_QUALITY.md)**           | SRP <= 260 LOC standard, strict linting, layer boundaries, and automated conventions gate        |
+| **[ARCHITECTURE.md](./ARCHITECTURE.md)**           | System topology, multi-source fusion math, data flows, and unified module structure              |
+| **[docs/DECISIONS.md](./docs/DECISIONS.md)**       | Architecture Decision Records (ADRs 001–005) documenting core engineering trade-offs             |
+| **[SECURITY.md](./SECURITY.md)**                   | STRIDE threat model, LLM output guardrails, Firestore Dirty Dozen invariants, OWASP Top 10       |
 | **[EFFICIENCY.md](./EFFICIENCY.md)**               | Production bundle benchmarks, caching architecture, complexity analysis, and Lighthouse strategy |
-| **[TESTING.md](./TESTING.md)**                     | Testing pyramid, 142-test catalog, V8 coverage breakdown, and CI execution guide                 |
-| **[ACCESSIBILITY.md](./ACCESSIBILITY.md)**         | WCAG 2.2 Level AA checklist, axe-core verification, keyboard maps, and contrast audit            |
+| **[TESTING.md](./TESTING.md)**                     | Testing pyramid, 29-suite / 197-test catalog, V8 coverage breakdown, and CI execution guide      |
+| **[ACCESSIBILITY.md](./ACCESSIBILITY.md)**         | WCAG 2.2 Level AA checklist, axe-core + contrast/landmark verification, and keyboard support     |
 | **[API_DOCUMENTATION.md](./API_DOCUMENTATION.md)** | Complete OpenAPI 3.0.3 YAML specification with request/response schemas and examples             |
 | **[DEPLOYMENT.md](./DEPLOYMENT.md)**               | Docker, Cloud Run, environment variable reference, and Firebase Auth/Firestore setup             |
 | **[CONTRIBUTING.md](./CONTRIBUTING.md)**           | Open-source contribution guidelines, style standards, and pull request checklist                 |

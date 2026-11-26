@@ -158,4 +158,18 @@ describe('AQIDashboard Component', () => {
     expect(screen.getByRole('button', { name: /Reload/i })).toBeInTheDocument();
     consoleSpy.mockRestore();
   });
+
+  it('shows offline indicator when browser goes offline and supports pull-to-refresh gesture', async () => {
+    render(<AQIDashboard lat={35.6762} lng={139.6503} locationName="Tokyo, Japan" />);
+    await screen.findByTestId('realtime-aqi-value');
+
+    const container = screen.getByTestId('aqi-dashboard');
+    fireEvent.touchStart(container, { touches: [{ clientY: 10 }] });
+    fireEvent.touchMove(container, { touches: [{ clientY: 180 }] });
+    expect(screen.getByText(/Release to refresh air quality data/i)).toBeInTheDocument();
+    fireEvent.touchEnd(container);
+
+    fireEvent(window, new Event('offline'));
+    expect(await screen.findByText(/Offline mode/i)).toBeInTheDocument();
+  });
 });

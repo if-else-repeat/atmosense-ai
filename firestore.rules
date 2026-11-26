@@ -1,15 +1,50 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Per-user data isolation — users can only read/write their own data
-    match /users/{userId}/{document=**} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+    function isAuthenticated() {
+      return request.auth != null;
     }
 
-    // Public community data (read-only for unauthenticated users)
+    function isVerifiedOwner(userId) {
+      return isAuthenticated()
+        && request.auth.uid == userId
+        && request.auth.token.email_verified == true;
+    }
+
+    function hasValidSize(maxKeys) {
+      return request.resource.data.keys().size() <= maxKeys;
+    }
+
+    // Per-user data isolation — users can only read/write their own data
+    match /users/{userId} {
+      allow list: if false;
+      allow get: if isAuthenticated() && request.auth.uid == userId;
+      allow create, update: if isVerifiedOwner(userId) && hasValidSize(16);
+      allow delete: if isVerifiedOwner(userId);
+
+      // Append-only AI advisories for audit integrity
+      match /advisories/{advisoryId} {
+        allow read: if isAuthenticated() && request.auth.uid == userId;
+        allow create: if isVerifiedOwner(userId) && hasValidSize(20);
+        allow update: if false;
+        allow delete: if isVerifiedOwner(userId);
+      }
+
+      // User-owned subcollections (saved locations, encrypted health vault)
+      match /{subcollection}/{docId} {
+        allow read: if isAuthenticated() && request.auth.uid == userId;
+        allow write: if isVerifiedOwner(userId) && hasValidSize(24);
+      }
+    }
+
+    // Public community data (read-only for unauthenticated users, bounded writes for signed-in users)
     match /community/{document=**} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if request.auth != null
+        && request.resource.data.keys().size() <= 16
+        && (!('description' in request.resource.data)
+            || (request.resource.data.description is string
+                && request.resource.data.description.size() <= 500));
     }
 
     // Deny all other access by default

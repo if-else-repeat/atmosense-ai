@@ -205,6 +205,19 @@ function WorkspaceShell() {
         )}
       </main>
 
+      <footer className="border-t border-slate-200 bg-white/80 py-4 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-400">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2 px-4 sm:px-6 lg:px-8">
+          <p>
+            AtmoSense AI · Grounded in WHO Global Air Quality Guidelines (2021) &amp; US EPA AQI
+            Standards.
+          </p>
+          <p>
+            Informational environmental guidance only — not a substitute for clinical medical
+            advice.
+          </p>
+        </div>
+      </footer>
+
       <OfflineIndicator />
     </div>
   );

@@ -3,7 +3,7 @@
  * Deterministic emergency advisory, multimodal image fallback, and symptom-AQI correlation insights.
  */
 
-import { getAQIColor } from '../../../lib/aqiEngine.ts';
+import { getAQIColor } from '../../lib/aqiEngine.ts';
 import {
   STANDARD_CITATIONS,
   type AQIDataPoint,
@@ -14,7 +14,6 @@ import {
   type ZoneData,
 } from './types.ts';
 
-/** Generates a deterministic emergency air quality advisory bulletin with WHO/EPA citations. */
 export function buildFallbackEmergencyAdvisory(
   zone: ZoneData,
   severity: 'moderate' | 'severe' | 'critical',
@@ -32,23 +31,22 @@ export function buildFallbackEmergencyAdvisory(
 
   const actionMap: Record<'moderate' | 'severe' | 'critical', string> = {
     moderate:
-      'Sensitive groups (children, older adults, and individuals with asthma or cardiopulmonary disease) should curtail prolonged outdoor exertion, limit errands to the 11:00-16:00 convective dispersion window, and avoid 06:00-10:00 morning inversion and 17:00-20:00 evening traffic peaks.',
+      'Sensitive groups (children, older adults, asthma/cardiopulmonary) should curb prolonged outdoor exertion, schedule errands in the 11:00-16:00 mixing window, and avoid 06:00-10:00 and 17:00-20:00 peaks.',
     severe:
-      'All residents should cancel outdoor athletic activities, keep windows sealed during 06:00-10:00 and 17:00-20:00 trapping periods, operate HEPA filtration indoors, and wear a well-fitting N95/FFP2 respirator for unavoidable outdoor transit.',
+      'Cancel outdoor sports, keep windows sealed during 06:00-10:00 and 17:00-20:00 trapping periods, run HEPA filtration indoors, and wear a fitted N95/FFP2 respirator outdoors.',
     critical:
-      'Health emergency: everyone must remain indoors in a sealed, HEPA-filtered clean-air room with zero outdoor exertion. Avoid exposure completely during the 06:00-10:00 morning inversion and 17:00-20:00 evening settling peaks, wear a fitted N95/FFP2 respirator if evacuation or essential travel is unavoidable, and seek immediate medical care for wheezing, chest pain, or shortness of breath.',
+      'Health emergency: stay indoors in a sealed, HEPA-filtered clean-air room with zero outdoor exertion. Avoid 06:00-10:00 and 17:00-20:00 peaks, wear a fitted N95/FFP2 respirator if travel is unavoidable, and seek urgent care for wheezing or chest pain.',
   };
 
   return [
     `${headerMap[severity]} — ${zone.name} [${language || 'en'}]`,
-    `Measured AQI: ${boundedAqi} (Tier Color: ${color}) | PM2.5: ${zone.pm25.toFixed(1)} µg/m³ | Dominant Pollutant: ${dominant}.`,
+    `Measured AQI: ${boundedAqi} (Tier Color: ${color}) | PM2.5: ${zone.pm25.toFixed(1)} µg/m³ | Dominant: ${dominant}.`,
     `Immediate Guidance: ${actionMap[severity]}`,
-    'Atmospheric Dispersion Note: Solar convection between 11:00-16:00 provides the highest vertical mixing; surface stagnation peaks during 06:00-10:00 and 17:00-20:00.',
+    'Dispersion Note: Solar convection (11:00-16:00) maximizes vertical mixing; surface stagnation peaks 06:00-10:00 and 17:00-20:00.',
     `Scientific References: ${STANDARD_CITATIONS.join(' ')}`,
   ].join('\n');
 }
 
-/** Generates a safe deterministic fallback response when multimodal image analysis cannot reach Gemini. */
 export function buildFallbackImageAnalysis(
   analysisType: ImageAnalysisType,
   fallbackReason?: string,
@@ -58,39 +56,37 @@ export function buildFallbackImageAnalysis(
     { summary: string; findings: string[]; recommendations: string[] }
   > = {
     'smog-severity': {
-      summary:
-        'Live visual smog classification is temporarily unavailable; rely on reference station AQI telemetry and visibility guidelines.',
+      summary: 'Visual smog classification is unavailable; use reference station AQI telemetry.',
       findings: [
         'Automated vision model could not inspect horizon visibility or aerosol haze density.',
-        'Visual haze alone cannot reliably quantify sub-micron PM2.5 concentrations under high humidity.',
+        'Visual haze alone cannot reliably quantify sub-micron PM2.5 under high humidity.',
       ],
       recommendations: [
-        'Verify live PM2.5/AQI readings from ground monitoring stations before outdoor exercise.',
-        'If distant landmarks (<2 km) appear obscured by yellow-gray haze, treat conditions as elevated and prefer 11:00-16:00 for brief errands.',
+        'Verify live PM2.5/AQI readings from ground stations before outdoor exercise.',
+        'If landmarks (<2 km) appear obscured by haze, prefer 11:00-16:00 for brief errands.',
       ],
     },
     'aqi-display': {
       summary:
-        'Automated OCR of the air quality monitor display is temporarily unavailable; please enter the numeric PM2.5/AQI reading directly.',
+        'Automated monitor OCR is unavailable; enter the numeric PM2.5/AQI reading directly.',
       findings: [
         'Display digit extraction requires the live multimodal vision backend.',
-        'Confirm whether your handheld monitor reports raw PM2.5 (µg/m³) or converted US EPA AQI.',
+        'Confirm whether your monitor reports raw PM2.5 (µg/m³) or US EPA AQI.',
       ],
       recommendations: [
-        'Compare handheld readings against WHO 24-hour PM2.5 guideline (15 µg/m³) and US EPA breakpoints.',
-        'Ensure laser-scattering sensors are operated away from steam or direct kitchen aerosols.',
+        'Compare handheld readings against WHO 24h PM2.5 (15 µg/m³) and US EPA breakpoints.',
+        'Operate laser-scattering sensors away from steam or kitchen aerosols.',
       ],
     },
     'mask-check': {
-      summary:
-        'Automated respirator fit inspection is temporarily unavailable; perform a manual seal check before entering polluted air.',
+      summary: 'Automated respirator fit check is unavailable; perform a manual seal check.',
       findings: [
         'Visual seal verification requires the live multimodal vision backend.',
-        'Effective PM2.5 filtration requires a NIOSH N95, EN149 FFP2, or certified KN95 respirator with zero perimeter gaps.',
+        'PM2.5 protection requires a NIOSH N95, EN149 FFP2, or certified KN95 with zero perimeter gaps.',
       ],
       recommendations: [
-        'Mold the nose wire firmly across the nasal bridge and verify both headstraps/earloops sit snugly.',
-        'Perform a positive/negative pressure user seal check: the mask should flex slightly inward on brisk inhalation with no air leaking around the eyes or cheeks.',
+        'Mold the nose wire firmly across the nasal bridge and ensure straps sit snugly.',
+        'Run a user seal check: mask should flex slightly inward on brisk inhalation without cheek/eye leaks.',
       ],
     },
   };

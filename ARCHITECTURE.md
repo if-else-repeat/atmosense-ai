@@ -76,9 +76,9 @@ User Opens App / Clicks "My Location"
 
 ### 2.2 Multi-Source Data Fusion & Outlier Dampening Algorithm
 
-Implemented in `server/services/aqiService.ts`:
+Implemented in `server/src/services/aqiService.ts` and `server/src/services/aqi/`:
 
-1. **Coordinate Quantization & Cache Lookup**: Coordinates are rounded to `3` decimal places (`~111 m` neighborhood grid) and hashed with SHA-256 (`createAQICacheKey('current', lat, lng)`) into a `100`-entry, `10`-minute TTL LRU cache.
+1. **Coordinate Quantization & Cache Lookup**: Coordinates are rounded to `3` decimal places (`~111 m` neighborhood grid) and hashed with SHA-256 (`createAQICacheKey('current', lat, lng)`) into a `100`-entry, `10`-minute TTL LRU cache (`server/src/services/aqi/cache.ts`).
 2. **Parallel Provider Acquisition**: Queries `WAQI` (reliability $r = 0.95$), `OpenAQ` ($r = 0.85$, skipped when retired/unkeyed), and `OpenWeather` ($r = 0.70$) concurrently under per-provider sliding-window rate limits (`60 req/min`), request timeouts (`6s`), and exponential backoff (`250ms * 2^attempt`) on `5xx`/`408`.
 3. **HTTP 410 Circuit-Breaker**: Any upstream returning `410 Gone` is recorded in `retiredSources` and bypassed on all future requests with zero warning noise.
 4. **Consensus Baseline & Outlier Dampening**:
@@ -89,114 +89,75 @@ Implemented in `server/services/aqiService.ts`:
      $$w_i = \begin{cases} r_i \times 0.2 & \text{if } d_i > 0.50 \\ r_i & \text{otherwise} \end{cases}$$
    - Normalize weights $\hat{w}_i = w_i / \sum_j w_j$ and compute fused composite AQI and pollutant concentrations, attaching a complete `SourceProvenance[]` audit trail to every response.
 
-### 2.3 Server-Side AI Request Lifecycle (`server/services/geminiService.ts`)
+### 2.3 Server-Side AI Request Lifecycle (`server/src/services/geminiService.ts`)
 
 ```text
 POST /api/ai/*
   │
   ├─► [1] Express Security Stack (Helmet, CORS, Rate Limit 30/min, Sanitize)
   ├─► [2] Zod Request Schema Validation (400 on malformed/out-of-range fields)
-  ├─► [3] Prompt Injection Sanitization (strips role overrides & control tokens)
+  ├─► [3] Prompt Injection Guard (sanitizePromptInput + scanPromptInjection)
   ├─► [4] SHA-256 Query Cache Lookup (instant hit for identical normalized prompt)
   ├─► [5] Server-Side @google/genai Call (temperature: 0.3, maxOutputTokens: 2048)
-  │        ├── Success → Zod Output Schema Validation
-  │        │               ├── Valid → Cache & Return Structured JSON
-  │        │               └── Invalid → Deterministic Heuristic Fallback
+  │        ├── Success → Zod Schema + Output Safety Guard (validateGeminiOutputSafety)
+  │        │               ├── Valid & Safe → Cache & Return Structured JSON
+  │        │               └── Invalid / Unsafe → Deterministic Heuristic Fallback
   │        └── Error / Missing Key / Timeout → Deterministic Heuristic Fallback
   └─► [6] PII-Free Structured Log (hashed userTag, operation, latency, cacheHit)
 ```
 
 ---
 
-## 3. Frontend Module Architecture
+## 3. Frontend & Backend Module Architecture
 
 ```text
 client/src/
-├── App.tsx                       # Workspace shell, GPS/IP auto-location, lazy tab router
-├── context/AuthContext.tsx       # Dynamic-import Firebase Auth & Firestore state manager
+├── App.tsx                          # Workspace shell, semantic landmarks, GPS/IP auto-location, lazy tab router
+├── context/AuthContext.tsx          # Dynamic-import Firebase Auth & Firestore state manager
 ├── hooks/
-│   ├── useAQI.ts                 # 10-min polling, abort-safe fetching, forecast hydration
-│   └── usePWAInstall.ts          # beforeinstallprompt capture & standalone detection
+│   ├── useAQI.ts                    # 10-min polling, abort-safe fetching, forecast hydration
+│   ├── useStationNetwork.ts         # Curated station network + hyperlocal coordinate state
+│   ├── aqiTelemetry.ts              # Normalized station/forecast fetch orchestration
+│   └── usePWAInstall.ts             # beforeinstallprompt capture & standalone detection
 ├── components/
-│   ├── Dashboard/                # Eagerly loaded primary view (Monitor tab)
-│   │   ├── AQIDashboard.tsx      # Hero AQI, pull-to-refresh, skeletons, retry state
-│   │   ├── PollutantCard.tsx     # React.memo card with sparkline + WHO/EPA progress bar
-│   │   ├── ForecastChart.tsx     # Lazy-loaded zero-dep SVG chart + .sr-only table
-│   │   ├── InversionIndicator.tsx# Diurnal boundary-layer trapping assessment
-│   │   └── HealthRecommendation.tsx
-│   ├── AirQualityMap.tsx         # Lazy chunk (46.7 KB gzip): Leaflet + OSM tiles
-│   ├── Family/                   # Lazy chunk (12.2 KB gzip): Profiles, Symptoms, Insights
-│   ├── Community/                # Lazy chunk (10.5 KB gzip): Feed, EJ Heatmap, Pledges, Board
-│   ├── HealthAssistantPanel.tsx  # Lazy chunk (7.8 KB gzip): AI Chat, Routine, Vision
-│   ├── SavedZonesPanel.tsx       # Lazy chunk (3.9 KB gzip): Firestore-synced zones
-│   ├── Routine/RoutineOptimizer.tsx
-│   ├── Voice/VoiceInterface.tsx
-│   ├── ErrorBoundary.tsx         # React error boundary with recovery UI
-│   └── OfflineIndicator.tsx      # Service worker / navigator.onLine status bar
-├── lib/
-│   ├── firebase.ts               # Lazy-imported Firebase App + Auth + Firestore dbId
-│   └── firestoreRepo.ts          # Owner-scoped CRUD + real-time snapshot listeners
+│   ├── ActionHub/                   # WinterSmogActionHub, SustainableAlternatives, IndoorAirHacks
+│   ├── Dashboard/                   # AQIDashboard, PollutantCard, ForecastChart, ForecastSvgPlot, InversionIndicator
+│   ├── Map/                         # MapControls paired with lazy AirQualityMap.tsx (Leaflet + OSM)
+│   ├── Family/                      # FamilyManager, SymptomTracker, SymptomLogForm, SymptomHistoryList, HealthInsights, InsightCard
+│   ├── Community/                   # CommunityHub, CommunityHeader, CommunityFeed, EnvironmentalJustice, PledgeSystem, Leaderboard
+│   ├── Assistant/                   # Modular AI Assistant panels paired with lazy HealthAssistantPanel.tsx
+│   ├── SavedZonesPanel.tsx          # Lazy chunk: local & synced monitoring zones
+│   ├── Routine/RoutineOptimizer.tsx # Personalized low-emission daily schedule
+│   ├── Voice/VoiceInterface.tsx     # Web Speech API hands-free audio controls
+│   ├── ErrorBoundary.tsx            # React error boundary with accessible recovery UI
+│   └── OfflineIndicator.tsx         # Service worker / navigator.onLine status bar
 └── utils/
-    ├── airQuality.ts             # Offline calibrated fallback stations
-    └── formatters.ts             # Relative time, AQI category badges, unit formatting
+    ├── airQuality.ts                # Offline calibrated fallback stations
+    ├── healthCrypto.ts              # Browser-local AES-256-GCM encryption
+    ├── locationStorage.ts           # Cached geolocation + online auto-refresh helpers
+    ├── personaGuidance.ts           # Pure clinical persona selection + personaTemplates.ts
+    ├── smogImpactEngine.ts          # Direct lung PM2.5, CO2/NOx & Corsi-Rosenthal CADR math
+    └── formatters.ts                # Relative time, AQI category badges, unit formatting
+
+server/src/
+├── index.ts                         # Express 5 app assembly + SPA static/Vite middleware
+├── lib/aqiEngine.ts                 # Official US EPA piecewise linear AQI & WHO 2021 calculations
+├── middleware/                      # security.ts, securityHelpers.ts, validate.ts
+├── routes/                          # airQuality.ts, aqi.ts, ai.ts (all Zod + rate-limit enforced)
+└── services/
+    ├── aqi/                         # cache.ts, fusion.ts, parsers.ts, forecastParsers.ts, types.ts
+    ├── fallback/                    # Deterministic WHO/EPA & inversion fallback heuristics
+    ├── gemini/                      # prompts.ts, schemas.ts, security.ts, outputGuard.ts, stationBrief.ts
+    ├── aqiService.ts                # Unified multi-source AQI service
+    ├── airQualityService.ts         # Curated stations, hyperlocal lookup & IP geolocation
+    └── geminiService.ts             # Single consolidated server-side Gemini AI service
 ```
 
 ---
 
 ## 4. Architecture Decision Records (ADRs)
 
-### ADR-001: Server-Side Proxy for All AI & Sensor API Keys
+Full Architecture Decision Records (**ADR-001 through ADR-005**) and engineering quality standards are maintained in:
 
-- **Status**: Accepted
-- **Context**: Exposing `GEMINI_API_KEY`, `WAQI_API_TOKEN`, or `OPENWEATHER_API_KEY` in client bundles (`VITE_*`) allows trivial key extraction, billing abuse, and quota exhaustion.
-- **Decision**: Route all AI and multi-source AQI calls through Express endpoints (`/api/ai/*`, `/api/aqi/*`, `/api/air-quality/*`). Only public Firebase web config remains client-side, protected by Firestore Security Rules.
-- **Consequences**: Zero secret exposure in compiled `dist/` assets; central rate limiting, Zod validation, and caching apply uniformly across all clients.
-
-### ADR-002: Deterministic Atmospheric Fallback Heuristics for AI Resilience
-
-- **Status**: Accepted
-- **Context**: Upstream LLM services can experience transient outages, latency spikes, or unconfigured keys in local/CI environments. Public health tools must never fail blank during hazardous air episodes.
-- **Decision**: Implement `server/services/heuristicFallback.ts` encoding WHO/EPA clinical thresholds and urban boundary-layer physics (06:00–10:00 morning inversion danger, 11:00–16:00 solar convection safe window, 17:00–20:00 evening peak) and invoke it automatically whenever Gemini fails or fails Zod validation.
-- **Consequences**: 100% endpoint availability and deterministic testability without sacrificing structured JSON contracts.
-
-### ADR-003: Native SVG Forecast Chart Over Third-Party Charting Libraries
-
-- **Status**: Accepted
-- **Context**: Libraries like Recharts, Chart.js, or ECharts add 60–180 KB gzipped and often generate inaccessible canvas bitmaps or complex ARIA trees.
-- **Decision**: Build `ForecastChart.tsx` as a lazy-loaded, pure native SVG component (`3.02 KB` gzipped) with explicit ARIA labeling, keyboard point selection, shaded convection mixing bands, and a parallel `.sr-only` data summary.
-- **Consequences**: Minimal bundle overhead, crisp HiDPI rendering in both light and dark modes, and effortless WCAG 2.2 AA compliance.
-
-### ADR-004: Zero-API-Key Leaflet + OpenStreetMap for Spatial Telemetry
-
-- **Status**: Accepted
-- **Context**: Proprietary map SDKs require billing-enabled browser keys and add significant runtime weight.
-- **Decision**: Use Leaflet 1.9.4 with OpenStreetMap raster tiles inside a `React.lazy` route chunk (`46.67 KB` gzipped), loaded only when the user opens the Map tab.
-- **Consequences**: Zero map billing dependencies, immediate open-source portability, and zero impact on initial Monitor tab load time.
-
-### ADR-005: Multi-Source Fusion with >50% Outlier Dampening & Silent HTTP 410 Circuit-Breaker
-
-- **Status**: Accepted
-- **Context**: Individual urban air quality monitors frequently drift or report erroneous spikes, and public APIs evolve (e.g., OpenAQ retired its unauthenticated v2 API with HTTP `410 Gone`).
-- **Decision**: Fuse `WAQI`, `OpenAQ`, and `OpenWeather` by base reliability weights, down-weight any provider deviating by `>50%` from consensus (`×0.2`), and permanently circuit-break any source returning HTTP `410 Gone` in memory without warning log spam.
-- **Consequences**: Resilient, auditable AQI readings with full provenance and clean production logs.
-
-### ADR-006: Route-Level Code Splitting & Dynamic Firebase Imports
-
-- **Status**: Accepted
-- **Context**: Eagerly importing Leaflet, Firebase Firestore, and all five workspace tabs produced a `401.6 KB` gzipped initial JS chunk.
-- **Decision**: Convert secondary tabs (`AirQualityMap`, `FamilyManager`, `CommunityHub`, `HealthAssistantPanel`, `SavedZonesPanel`) to `React.lazy` and dynamically `import()` `firebase/auth` and `firestoreRepo` inside `AuthContext.tsx` so Firestore is only fetched when authenticated.
-- **Consequences**: Reduced initial JS entry chunk by **62%** (`401.6 KB` → `153.3 KB` gzipped; `171.1 KB` total initial payload including CSS and HTML), comfortably beneath the `300 KB` gzipped performance budget.
-
-### ADR-007: Privacy-First Family Health Storage & Explicit AI Consent
-
-- **Status**: Accepted
-- **Context**: Household respiratory symptoms constitute sensitive personal health data under GDPR Article 9 and general health privacy norms.
-- **Decision**: Encrypt family health records locally with AES-256-GCM, exclude all health fields from request logs and analytics, gate AI correlation behind an explicit opt-in consent checkbox, and provide a one-click GDPR full deletion control.
-- **Consequences**: Users retain complete ownership of respiratory logs while still accessing AI correlation insights on demand.
-
-### ADR-008: Strict Owner-Scoped Firestore Security Rules
-
-- **Status**: Accepted
-- **Context**: Authenticated users sync personal monitoring zones, alert thresholds, and saved advisories in Cloud Firestore.
-- **Decision**: Enforce path-level ownership (`request.auth != null && request.auth.uid == userId`), strict field whitelisting, type/bounds validation, and immutable `uid`/`createdAt` invariants in `firestore.rules`.
-- **Consequences**: Zero cross-tenant data access and defense-in-depth independent of client UI logic.
+- **[docs/DECISIONS.md](./docs/DECISIONS.md)** — Detailed ADR trade-offs covering multi-source fusion & outlier dampening, server-side Gemini guardrails & deterministic fallback, AES-256-GCM health privacy, native SVG/Leaflet zero-bloat frontend, and single-manifest architecture conventions.
+- **[CODE_QUALITY.md](./CODE_QUALITY.md)** — Module size caps (`<= 260` lines target / `<= 300` hard cap), strict linting, layer boundary rules, and automated enforcement via `server/tests/conventions.test.ts`.

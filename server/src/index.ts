@@ -11,7 +11,7 @@ import {
   inputValidator,
   rateLimiter,
   requestLogger,
-} from '../middleware/security.ts';
+} from './middleware/security.ts';
 import { aiRouter } from './routes/ai.ts';
 import { airQualityRouter } from './routes/airQuality.ts';
 import { aqiRouter } from './routes/aqi.ts';

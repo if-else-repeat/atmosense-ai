@@ -30,16 +30,15 @@ export default tseslint.config(
         },
       ],
       'no-console': 'error',
+      'no-eval': 'error',
+      'no-implied-eval': 'error',
+      eqeqeq: ['error', 'always'],
+      'no-var': 'error',
+      'prefer-const': 'error',
     },
   },
   {
-    files: [
-      '**/*.test.ts',
-      '**/*.test.tsx',
-      '**/*.vitest.ts',
-      '**/*.vitest.tsx',
-      'client/src/test/**',
-    ],
+    files: ['**/*.test.ts', '**/*.test.tsx', 'client/src/tests/**'],
     rules: {
       'no-console': 'off',
     },

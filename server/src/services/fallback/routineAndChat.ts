@@ -3,7 +3,7 @@
  * Deterministic boundary-layer routine and conversational pulmonary chat fallback generators.
  */
 
-import { getHealthRecommendation, type PersonaProfile } from '../../../lib/aqiEngine.ts';
+import { getHealthRecommendation, type PersonaProfile } from '../../lib/aqiEngine.ts';
 import {
   ATMOSPHERIC_WINDOWS,
   STANDARD_CITATIONS,

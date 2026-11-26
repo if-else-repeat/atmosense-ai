@@ -2,7 +2,7 @@ name: AtmoSense AI CI
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main]
   pull_request:
     branches: [main]
 
@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   quality-and-test:
-    name: Lint, Typecheck, Unit & UI Tests
+    name: Format, Typecheck, Lint, Unit & UI Tests
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -30,17 +30,14 @@ jobs:
       - name: Check Prettier formatting
         run: npm run format:check
 
-      - name: Run ESLint (code + Firestore rules)
-        run: npm run lint:eslint
+      - name: TypeScript strict typecheck
+        run: npx tsc --noEmit
 
-      - name: TypeScript strict check
+      - name: Run ESLint and strict checks
         run: npm run lint
 
-      - name: Run Vitest & React Testing Library suite
-        run: npm run test:ci
-
-      - name: Run Firestore rules invariant test suite
-        run: npx vitest run firestore.rules.test.ts
+      - name: Run full Vitest test suite (unit, integration, a11y, conventions, rules)
+        run: npm test
 
       - name: Build production client bundle
         run: npm run build

@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { TrendChartSvg } from './TrendChartSvg';
-import { OFFLINE_FALLBACK_STATIONS } from '../utils/airQuality';
+import { TrendChartSvg } from '../../components/TrendChartSvg';
+import { OFFLINE_FALLBACK_STATIONS } from '../../utils/airQuality';
 
 describe('TrendChartSvg', () => {
   it('renders native SVG chart and switches pollutant series interactively', () => {

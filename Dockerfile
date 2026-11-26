@@ -2,8 +2,6 @@
 FROM node:22-alpine AS client-build
 WORKDIR /app
 COPY package*.json ./
-COPY client/package.json ./client/
-COPY server/package.json ./server/
 RUN npm ci
 COPY . .
 RUN npm run build
@@ -13,10 +11,8 @@ FROM node:22-alpine AS production
 WORKDIR /app
 ENV NODE_ENV=production
 
-# Copy root and workspace manifests so npm ci resolves cleanly
+# Copy root package manifests for deterministic production install
 COPY package*.json ./
-COPY client/package.json ./client/
-COPY server/package.json ./server/
 
 # Install production dependencies only
 RUN npm ci --omit=dev

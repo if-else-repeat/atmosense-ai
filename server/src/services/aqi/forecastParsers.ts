@@ -3,7 +3,7 @@
  * Forecast payload normalizers for WAQI daily forecasts and OpenWeather hourly forecasts.
  */
 
-import { calculateAQI, getAQIColor } from '../../../lib/aqiEngine.ts';
+import { calculateAQI, getAQIColor } from '../../lib/aqiEngine.ts';
 import type { OpenWeatherResponse, WAQIResponse } from './parsers.ts';
 import type { ForecastData } from './types.ts';
 import {

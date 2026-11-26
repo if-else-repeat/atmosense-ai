@@ -27,6 +27,8 @@ export function ForecastSvgPlot({
       aria-label={`24-hour AQI forecast curve for ${locationName}`}
       className="h-auto w-full select-none"
     >
+      <title>{`24-hour AQI forecast curve for ${locationName}`}</title>
+      <desc>{`Hourly air quality index projection highlighting the 11:00 to 16:00 solar dispersion window for ${locationName}.`}</desc>
       <defs>
         <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor="#0891B2" stopOpacity="0.24" />

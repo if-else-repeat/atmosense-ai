@@ -7,20 +7,29 @@ const currentDir = dirname(fileURLToPath(import.meta.url));
 const rulesPath = resolve(currentDir, './firestore.rules');
 const rules = readFileSync(rulesPath, 'utf8');
 
-describe('Firestore Security Rules', () => {
-  it('should enforce per-user data isolation', () => {
+describe('Firestore Security Rules Invariants', () => {
+  it('enforces per-user data isolation and forbids blanket /users listing', () => {
     expect(rules).toContain('request.auth.uid == userId');
+    expect(rules).toContain('allow list: if false');
   });
 
-  it('should deny access by default', () => {
-    expect(rules).toContain('allow read, write: if false');
+  it('requires verified email identity and bounded key sizes on user writes', () => {
+    expect(rules).toContain('request.auth.token.email_verified == true');
+    expect(rules).toContain('hasValidSize(');
   });
 
-  it('should allow public read access to community data', () => {
+  it('enforces append-only integrity on stored AI advisories', () => {
+    expect(rules).toContain('match /advisories/{advisoryId}');
+    expect(rules).toContain('allow update: if false');
+  });
+
+  it('allows public read and bounded authenticated writes on community documents', () => {
     expect(rules).toContain('allow read: if true');
+    expect(rules).toContain('allow write: if request.auth != null');
+    expect(rules).toContain('description.size() <= 500');
   });
 
-  it('should require authentication for community writes', () => {
-    expect(rules).toContain('allow write: if request.auth != null');
+  it('denies all unmatched paths by default', () => {
+    expect(rules).toContain('allow read, write: if false');
   });
 });
