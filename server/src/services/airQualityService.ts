@@ -1,11 +1,11 @@
-import { aqiService } from './aqiService';
-import type { AirQualityStation, HourlyPoint, PollutantMetrics } from '../types/airQuality';
+import { aqiService } from './aqiService.ts';
+import type { AirQualityStation, HourlyPoint, PollutantMetrics } from '../types/airQuality.ts';
 import {
   classifyAqi,
   computeCompositeAqi,
   computeWhoRatio,
   findBestOutdoorWindow,
-} from '../utils/aqi';
+} from '../utils/aqi.ts';
 
 interface StationSeed {
   id: string;

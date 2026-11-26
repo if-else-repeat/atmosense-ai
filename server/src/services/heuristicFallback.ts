@@ -10,7 +10,7 @@
  * - Evening peak: 17:00–20:00 (commuter traffic surge + cold air settling)
  */
 
-import { getAQIColor, getHealthRecommendation, type PersonaProfile } from '../../lib/aqiEngine';
+import { getAQIColor, getHealthRecommendation, type PersonaProfile } from '../../lib/aqiEngine.ts';
 
 /** Canonical atmospheric boundary-layer risk windows used by fallback heuristics. */
 export const ATMOSPHERIC_WINDOWS = {

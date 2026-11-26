@@ -3,7 +3,7 @@
  * Shared TypeScript interfaces, provenance models, and error types for {@link AQIService}.
  */
 
-import type { AQICategoryLabel } from '../../../lib/aqiEngine';
+import type { AQICategoryLabel } from '../../../lib/aqiEngine.ts';
 
 /** Identifier for supported upstream air quality providers. */
 export type AQISourceName = 'WAQI' | 'OpenAQ' | 'OpenWeather';

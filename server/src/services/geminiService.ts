@@ -4,9 +4,9 @@ import type {
   ChatTurn,
   HealthAdvisoryResult,
   SensitivityProfile,
-} from '../types/airQuality';
+} from '../types/airQuality.ts';
 
-export * from './geminiEngineService';
+export * from './geminiEngineService.ts';
 
 const DEFAULT_MODEL = 'gemini-4-hydrogen';
 

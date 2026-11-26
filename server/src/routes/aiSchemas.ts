@@ -1,6 +1,6 @@
 import type { NextFunction, Request, Response } from 'express';
 import { z } from 'zod';
-import { GeminiServiceError } from '../services/geminiService';
+import { GeminiServiceError } from '../services/geminiService.ts';
 
 export const sensitivitySchema = z.enum(['general', 'respiratory', 'athlete', 'vulnerable']);
 export const personaSchema = z.enum(['children', 'elderly', 'asthmatics', 'general']);

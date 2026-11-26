@@ -4,7 +4,7 @@ import {
   getAllStations,
   getStationByCoordinates,
   getStationById,
-} from '../services/airQualityService';
+} from '../services/airQualityService.ts';
 
 export const airQualityRouter = Router();
 

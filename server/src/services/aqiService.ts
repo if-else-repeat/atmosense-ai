@@ -15,9 +15,9 @@ import {
   getAQIColor,
   type AQICategoryLabel,
   type PollutantReadings,
-} from '../../lib/aqiEngine';
-import { logger } from '../utils/logger';
-import { createAQICacheKey, LRUCache } from './aqi/cache';
+} from '../../lib/aqiEngine.ts';
+import { logger } from '../utils/logger.ts';
+import { createAQICacheKey, LRUCache } from './aqi/cache.ts';
 import {
   AQIServiceError,
   type AQILogger,
@@ -29,7 +29,7 @@ import {
   type RateLimitConfig,
   type SourceProvenance,
   type SourceStatus,
-} from './aqi/types';
+} from './aqi/types.ts';
 
 export { AQIServiceError, createAQICacheKey, LRUCache };
 export type {
@@ -95,11 +95,13 @@ const defaultSleep = (ms: number): Promise<void> =>
 class SourceRateLimiter {
   private readonly timestamps: number[] = [];
   private blockedUntil: number | null = null;
+  private readonly config: RateLimitConfig;
+  private readonly now: () => number;
 
-  constructor(
-    private readonly config: RateLimitConfig,
-    private readonly now: () => number,
-  ) {}
+  constructor(config: RateLimitConfig, now: () => number) {
+    this.config = config;
+    this.now = now;
+  }
 
   /** Attempts to consume one request slot; returns false if rate-limited or cooling down. */
   tryAcquire(): boolean {

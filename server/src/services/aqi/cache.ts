@@ -4,7 +4,7 @@
  */
 
 import { createHash } from 'node:crypto';
-import type { CacheStats } from './types';
+import type { CacheStats } from './types.ts';
 
 interface CacheEntry<T> {
   value: T;

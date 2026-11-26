@@ -11,11 +11,11 @@ import {
   inputValidator,
   rateLimiter,
   requestLogger,
-} from '../middleware/security';
-import { aiRouter } from './routes/ai';
-import { airQualityRouter } from './routes/airQuality';
-import { aqiRouter } from './routes/aqi';
-import { logger } from './utils/logger';
+} from '../middleware/security.ts';
+import { aiRouter } from './routes/ai.ts';
+import { airQualityRouter } from './routes/airQuality.ts';
+import { aqiRouter } from './routes/aqi.ts';
+import { logger } from './utils/logger.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

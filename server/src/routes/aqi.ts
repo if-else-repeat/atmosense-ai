@@ -14,8 +14,8 @@ import {
   getAQIColor,
   getHealthRecommendation,
   type PersonaProfile,
-} from '../../lib/aqiEngine';
-import { AQIService, AQIServiceError, aqiService } from '../services/aqiService';
+} from '../../lib/aqiEngine.ts';
+import { AQIService, AQIServiceError, aqiService } from '../services/aqiService.ts';
 
 const VALID_PERSONAS: ReadonlySet<PersonaProfile> = new Set([
   'children',

@@ -15,8 +15,8 @@ import type { ErrorRequestHandler, NextFunction, Request, RequestHandler, Respon
 import helmet from 'helmet';
 import morgan from 'morgan';
 import crypto from 'node:crypto';
-import { logger } from '../src/utils/logger';
-import { sanitizePayloadDeep, validateBody, validateQuery } from './validate';
+import { logger } from '../src/utils/logger.ts';
+import { sanitizePayloadDeep, validateBody, validateQuery } from './validate.ts';
 
 export { validateBody, validateQuery };
 

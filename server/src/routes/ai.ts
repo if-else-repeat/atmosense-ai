@@ -4,14 +4,14 @@
  */
 
 import express, { Router, type Request, type Response } from 'express';
-import { getStationByCoordinates, getStationById } from '../services/airQualityService';
+import { getStationByCoordinates, getStationById } from '../services/airQualityService.ts';
 import {
   GeminiService,
   geminiService,
   generateAirQualityChatReply,
   generateHealthAdvisory,
   type ChatMessage,
-} from '../services/geminiService';
+} from '../services/geminiService.ts';
 import {
   advisoryBodySchema,
   analyzeImageRequestSchema,
@@ -24,7 +24,7 @@ import {
   routineRequestSchema,
   stationChatBodySchema,
   type AiRateLimitOptions,
-} from './aiSchemas';
+} from './aiSchemas.ts';
 
 /**
  * Factory creating the unified Express AI router backed by {@link GeminiService}.

@@ -14,9 +14,9 @@
 
 import { GoogleGenAI, ThinkingLevel, Type, type Schema } from '@google/genai';
 import { createHash } from 'node:crypto';
-import { type PersonaProfile } from '../../lib/aqiEngine';
-import { logger } from '../utils/logger';
-import { LRUCache } from './aqiService';
+import { type PersonaProfile } from '../../lib/aqiEngine.ts';
+import { logger } from '../utils/logger.ts';
+import { LRUCache } from './aqiService.ts';
 import {
   ATMOSENSE_SYSTEM_INSTRUCTION,
   ChatResponseOutputSchema,
@@ -34,7 +34,7 @@ import {
   parseBase64Image,
   redactPII,
   sanitizeUserInput,
-} from './gemini/security';
+} from './gemini/security.ts';
 import {
   buildFallbackChat,
   buildFallbackEmergencyAdvisory,
@@ -51,7 +51,7 @@ import {
   type RoutinePlan,
   type SymptomLog,
   type ZoneData,
-} from './heuristicFallback';
+} from './heuristicFallback.ts';
 
 export {
   ATMOSENSE_SYSTEM_INSTRUCTION,
@@ -336,12 +336,15 @@ class GoogleGenAIModelAdapter implements GenerativeModel {
  */
 class UserRateLimiter {
   private readonly buckets = new Map<string, number[]>();
+  private readonly maxRequests: number;
+  private readonly windowMs: number;
+  private readonly now: () => number;
 
-  constructor(
-    private readonly maxRequests: number,
-    private readonly windowMs: number,
-    private readonly now: () => number,
-  ) {}
+  constructor(maxRequests: number, windowMs: number, now: () => number) {
+    this.maxRequests = maxRequests;
+    this.windowMs = windowMs;
+    this.now = now;
+  }
 
   checkAndConsume(
     userId: string,

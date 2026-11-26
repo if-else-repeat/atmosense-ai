@@ -1,4 +1,4 @@
-import type { AqiClassification, HourlyPoint, PollutantMetrics } from '../types/airQuality';
+import type { AqiClassification, HourlyPoint, PollutantMetrics } from '../types/airQuality.ts';
 
 interface Breakpoint {
   cLow: number;
